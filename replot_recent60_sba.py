@@ -24,6 +24,7 @@ STATION_NAMES = {
 
 RASS_BASE = "https://downloads.psl.noaa.gov/psd2/data/realtime/Radar449/WwTemp/sba/"
 MADIS_BASE = "https://madis-data.ncep.noaa.gov/madisPublic/cgi-bin/madisXmlPublicDir"
+CWOP_XML_BASE = "http://www.findu.com/cgi-bin/wxxml.cgi"
 
 # Repo-relative outputs so GitHub Actions can run this anywhere.
 CHART_PATH = Path("sba_wwtemp_chart.svg")
@@ -32,10 +33,15 @@ RASS_TEXT_PATH = Path("sba_latest.01t")
 
 MS_TO_MPH = 2.23694
 PST = timezone(timedelta(hours=-8), name="PST")
+HTTP_USER_AGENT = "Mozilla/5.0 (compatible; sb-live-lapse/1.0)"
+CWOP_ELEV_M = {
+    "KC6OYN": 1201.0,
+}
 
 
 def fetch_text(url: str, timeout: int = 25) -> str:
-    with urllib.request.urlopen(url, timeout=timeout) as response:
+    req = urllib.request.Request(url, headers={"User-Agent": HTTP_USER_AGENT})
+    with urllib.request.urlopen(req, timeout=timeout) as response:
         return response.read().decode("utf-8", errors="ignore")
 
 
@@ -221,11 +227,137 @@ def fetch_station(station_id: str) -> Dict:
     return out
 
 
-def utc_iso_to_pst_hhmm(iso_time: Optional[str]) -> Optional[str]:
+def parse_float(raw: Optional[str]) -> Optional[float]:
+    if raw is None:
+        return None
+    text = raw.strip()
+    if not text:
+        return None
+    try:
+        return float(text)
+    except ValueError:
+        return None
+
+
+def parse_iso_utc(iso_time: Optional[str]) -> Optional[datetime]:
     if not iso_time:
         return None
     fmt = "%Y-%m-%dT%H:%M:%S" if len(iso_time) == 19 else "%Y-%m-%dT%H:%M"
-    dt_utc = datetime.strptime(iso_time, fmt).replace(tzinfo=timezone.utc)
+    return datetime.strptime(iso_time, fmt).replace(tzinfo=timezone.utc)
+
+
+def dewpoint_c_from_temp_rh(temp_c: float, rh_pct: float) -> Optional[float]:
+    if rh_pct <= 0.0 or rh_pct > 100.0:
+        return None
+    a = 17.625
+    b = 243.04
+    gamma = math.log(rh_pct / 100.0) + (a * temp_c) / (b + temp_c)
+    return (b * gamma) / (a - gamma)
+
+
+def fetch_station_cwop(station_id: str) -> Dict:
+    out = {
+        "id": station_id,
+        "name": STATION_NAMES.get(station_id, station_id),
+        "elev_m": CWOP_ELEV_M.get(station_id),
+        "temp_c": None,
+        "dew_c": None,
+        "temp_ob_time": None,
+        "provider": None,
+        "wind_dir": None,
+        "wind_spd_mps": None,
+        "wind_gust_mps": None,
+        "wind_ob_time": None,
+    }
+
+    url = CWOP_XML_BASE + "?" + urllib.parse.urlencode({"call": station_id, "last": "2"})
+    try:
+        raw = fetch_text(url, timeout=18)
+        if "<station" not in raw:
+            return out
+        root = ET.fromstring(raw)
+    except Exception:
+        return out
+
+    latest_dt: Optional[datetime] = None
+    latest_rep: Optional[ET.Element] = None
+    for rep in root.findall("weatherReport"):
+        ts = (rep.findtext("timeReceived") or "").strip()
+        if not ts:
+            continue
+        try:
+            dt_utc = datetime.strptime(ts, "%Y%m%d%H%M%S").replace(tzinfo=timezone.utc)
+        except ValueError:
+            continue
+        if latest_dt is None or dt_utc > latest_dt:
+            latest_dt = dt_utc
+            latest_rep = rep
+
+    if latest_dt is None or latest_rep is None:
+        return out
+
+    temp_f = parse_float(latest_rep.findtext("temperature"))
+    rh_pct = parse_float(latest_rep.findtext("humidity"))
+    wind_dir = parse_float(latest_rep.findtext("windDirection"))
+    wind_spd_mph = parse_float(latest_rep.findtext("windSpeed"))
+    wind_gust_mph = parse_float(latest_rep.findtext("windGust"))
+
+    obs_iso = latest_dt.strftime("%Y-%m-%dT%H:%M")
+    if temp_f is not None:
+        out["temp_c"] = (temp_f - 32.0) * (5.0 / 9.0)
+        out["temp_ob_time"] = obs_iso
+    if out["temp_c"] is not None and rh_pct is not None:
+        out["dew_c"] = dewpoint_c_from_temp_rh(out["temp_c"], rh_pct)
+
+    if wind_dir is not None:
+        out["wind_dir"] = wind_dir
+    if wind_spd_mph is not None:
+        out["wind_spd_mps"] = wind_spd_mph / MS_TO_MPH
+        out["wind_ob_time"] = obs_iso
+    if wind_gust_mph is not None:
+        out["wind_gust_mps"] = wind_gust_mph / MS_TO_MPH
+        out["wind_ob_time"] = obs_iso
+    if out["temp_ob_time"] is not None:
+        out["provider"] = "CWOP-findU"
+
+    return out
+
+
+def update_age_and_recency(row: Dict, now_utc: datetime) -> None:
+    row["recent"] = False
+    row["age_min"] = None
+    dt_utc = parse_iso_utc(row.get("temp_ob_time"))
+    if dt_utc is not None:
+        row["age_min"] = (now_utc - dt_utc).total_seconds() / 60.0
+        row["recent"] = row["age_min"] <= 60.0
+
+
+def should_try_cwop(row: Dict) -> bool:
+    return row.get("temp_c") is None or not row.get("recent")
+
+
+def merge_cwop_if_needed(madis_row: Dict, cwop_row: Dict) -> Dict:
+    if cwop_row.get("temp_c") is None:
+        return madis_row
+
+    if madis_row.get("temp_c") is not None and madis_row.get("recent"):
+        return madis_row
+
+    merged = dict(madis_row)
+    for key in ("temp_c", "dew_c", "temp_ob_time", "wind_dir", "wind_spd_mps", "wind_gust_mps", "wind_ob_time"):
+        if cwop_row.get(key) is not None:
+            merged[key] = cwop_row[key]
+    if merged.get("elev_m") is None and cwop_row.get("elev_m") is not None:
+        merged["elev_m"] = cwop_row["elev_m"]
+    if cwop_row.get("temp_ob_time") is not None:
+        merged["provider"] = cwop_row.get("provider") or "CWOP-findU"
+    return merged
+
+
+def utc_iso_to_pst_hhmm(iso_time: Optional[str]) -> Optional[str]:
+    dt_utc = parse_iso_utc(iso_time)
+    if dt_utc is None:
+        return None
     return dt_utc.astimezone(PST).strftime("%H:%M")
 
 
@@ -385,11 +517,16 @@ def draw_svg(
 
     row_y = list_y0 + 16
     for row in stations_all:
-        wind_time = utc_iso_to_pst_hhmm(row.get("wind_ob_time"))
-        if wind_time:
-            text = "%s @ %s - %s" % (row["name"], wind_time, wind_text_for_row(row))
+        temp_text = "temp missing"
+        if row.get("temp_c") is not None:
+            temp_text = "%.1fC" % row["temp_c"]
+
+        obs_time = row.get("wind_ob_time") or row.get("temp_ob_time")
+        time_text = utc_iso_to_pst_hhmm(obs_time)
+        if time_text:
+            text = "%s @ %s - %s, %s" % (row["name"], time_text, temp_text, wind_text_for_row(row))
         else:
-            text = "%s @ missing - winds missing" % row["name"]
+            text = "%s @ missing - %s, winds missing" % (row["name"], temp_text)
         lines.append('<text class="legend-row" x="%d" y="%d">%s</text>' % (legend_x, row_y, text))
         row_y += 14
 
@@ -417,16 +554,28 @@ def main() -> None:
     stations.sort(key=lambda r: order[r["id"]])
 
     for row in stations:
-        row["recent"] = False
-        row["age_min"] = None
-        if row.get("temp_ob_time"):
-            dt_utc = datetime.strptime(row["temp_ob_time"], "%Y-%m-%dT%H:%M").replace(tzinfo=timezone.utc)
-            row["age_min"] = (now_utc - dt_utc).total_seconds() / 60.0
-            row["recent"] = row["age_min"] <= 60.0
+        update_age_and_recency(row, now_utc)
+
+    cwop_targets = [row["id"] for row in stations if should_try_cwop(row)]
+    if cwop_targets:
+        cwop_rows: Dict[str, Dict] = {}
+        with ThreadPoolExecutor(max_workers=4) as pool:
+            futures = {pool.submit(fetch_station_cwop, station_id): station_id for station_id in cwop_targets}
+            for fut in as_completed(futures):
+                cwop = fut.result()
+                cwop_rows[cwop["id"]] = cwop
+
+        for i, row in enumerate(stations):
+            cwop_row = cwop_rows.get(row["id"])
+            if cwop_row is not None:
+                stations[i] = merge_cwop_if_needed(row, cwop_row)
+
+    for row in stations:
+        update_age_and_recency(row, now_utc)
 
     stations_recent = [r for r in stations if r.get("recent") and r.get("temp_c") is not None and r.get("elev_m") is not None]
 
-    title = "Estimated Cloud Base @ VOR: missing"
+    title = "Estimated LCL @ VOR: missing"
     vor = next((r for r in stations if r["id"] == "SE068"), None)
     vor_wind = "winds missing"
     if vor is not None:
@@ -436,11 +585,11 @@ def main() -> None:
         cloud_base_i = int(round(cloud_base_m))
         time_hhmm = utc_iso_to_pst_hhmm(vor.get("temp_ob_time"))
         if time_hhmm:
-            title = f"Estimated Cloud Base @ VOR: {cloud_base_i} m - {vor_wind} ({time_hhmm} PST)"
+            title = f"Estimated LCL @ VOR: {cloud_base_i} m - {vor_wind} ({time_hhmm} PST)"
         else:
-            title = f"Estimated Cloud Base @ VOR: {cloud_base_i} m - {vor_wind}"
+            title = f"Estimated LCL @ VOR: {cloud_base_i} m - {vor_wind}"
     else:
-        title = f"Estimated Cloud Base @ VOR: missing - {vor_wind}"
+        title = f"Estimated LCL @ VOR: missing - {vor_wind}"
 
     rass_hhmm = utc_iso_to_pst_hhmm(rass_time_utc) or "missing"
 
@@ -468,10 +617,11 @@ def main() -> None:
     print("recent_station_count=%d" % len(stations_recent))
     for row in stations:
         print(
-            "%s name=%s temp=%s dew=%s wind_time=%s recent=%s"
+            "%s name=%s provider=%s temp=%s dew=%s wind_time=%s recent=%s"
             % (
                 row["id"],
                 row["name"],
+                row.get("provider") or "none",
                 "" if row.get("temp_c") is None else "%.2f" % row["temp_c"],
                 "" if row.get("dew_c") is None else "%.2f" % row["dew_c"],
                 row.get("wind_ob_time") or "missing",
