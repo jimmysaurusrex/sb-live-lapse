@@ -426,7 +426,16 @@ def main() -> None:
 
     stations_recent = [r for r in stations if r.get("recent") and r.get("temp_c") is not None and r.get("elev_m") is not None]
 
-    title = "Santa Barbara Lapse Chart (Updates every 15min)"
+    title = "Estimated Cloud Base @ VOR: missing"
+    vor = next((r for r in stations if r["id"] == "SE068"), None)
+    if vor and vor.get("elev_m") is not None and vor.get("temp_c") is not None and vor.get("dew_c") is not None:
+        cloud_base_m = vor["elev_m"] + 125.0 * (vor["temp_c"] - vor["dew_c"])
+        cloud_base_i = int(round(cloud_base_m))
+        time_hhmm = utc_iso_to_pst_hhmm(vor.get("temp_ob_time"))
+        if time_hhmm:
+            title = f"Estimated Cloud Base @ VOR: {cloud_base_i} m ({time_hhmm} PST)"
+        else:
+            title = f"Estimated Cloud Base @ VOR: {cloud_base_i} m"
 
     rass_hhmm = utc_iso_to_pst_hhmm(rass_time_utc) or "missing"
 
