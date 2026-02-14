@@ -20,7 +20,7 @@ STATION_NAMES = {
     "SE234": "AntFarm",
     "MTIC1": "Montecito",
     "MPWC1": "SM Pass",
-    "421SE": "Upper Parma",
+    "421SE": "Parma",
     "SE053": "Romero Cyn",
     "KSBA": "Airport",
 }

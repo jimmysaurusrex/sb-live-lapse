@@ -13,7 +13,7 @@
   .station-label { font-family: Helvetica, Arial, sans-serif; font-size: 11px; fill: #444444; }
 </style>
 <rect x="0" y="0" width="1180" height="760" fill="#ffffff" />
-<text class="title" x="90" y="28">Estimated LCL @ VOR: 1103 m - winds 164, 7g16mph (15:20 PST)</text>
+<text class="title" x="90" y="28">Estimated LCL @ VOR: 1103 m - winds 171, 7g13mph (15:30 PST)</text>
 <line class="grid" x1="90" y1="510.00" x2="1110" y2="510.00" />
 <text class="label" x="82" y="514.00" text-anchor="end">0</text>
 <line class="grid" x1="90" y1="439.23" x2="1110" y2="439.23" />
@@ -50,18 +50,16 @@
 <circle class="rass-point" cx="610.85" cy="191.54" r="2" />
 <rect class="station" x="456.36" y="82.03" width="6" height="6" />
 <text class="station-label" x="465.36" y="89.03" text-anchor="start">La Cumbre</text>
-<rect class="station" x="372.26" y="128.42" width="6" height="6" />
-<text class="station-label" x="381.26" y="135.42" text-anchor="start">VOR</text>
+<rect class="station" x="363.13" y="128.42" width="6" height="6" />
+<text class="station-label" x="372.13" y="135.42" text-anchor="start">VOR</text>
 <rect class="station" x="534.69" y="253.01" width="6" height="6" />
 <text class="station-label" x="543.69" y="260.01" text-anchor="start">AntFarm</text>
-<rect class="station" x="745.08" y="332.38" width="6" height="6" />
-<text class="station-label" x="754.08" y="339.38" text-anchor="start">Montecito</text>
 <rect class="station" x="827.55" y="346.18" width="6" height="6" />
 <text class="station-label" x="836.55" y="353.18" text-anchor="start">SM Pass</text>
-<rect class="station" x="941.35" y="422.89" width="6" height="6" />
-<text class="station-label" x="950.35" y="429.89" text-anchor="start">Upper Parma</text>
-<rect class="station" x="852.27" y="416.10" width="6" height="6" />
-<text class="station-label" x="861.27" y="447.10" text-anchor="start">Romero Cyn</text>
+<rect class="station" x="907.13" y="422.89" width="6" height="6" />
+<text class="station-label" x="916.13" y="429.89" text-anchor="start">Parma</text>
+<rect class="station" x="870.83" y="416.10" width="6" height="6" />
+<text class="station-label" x="879.83" y="447.10" text-anchor="start">Romero Cyn</text>
 <rect class="station" x="984.26" y="505.94" width="6" height="6" />
 <text class="station-label" x="993.26" y="510.00" text-anchor="start">Airport</text>
 <line class="rass" x1="90" y1="562" x2="114" y2="562" />
@@ -69,12 +67,12 @@
 <line class="dalr" x1="310" y1="562" x2="334" y2="562" />
 <text class="label" x="340" y="566">DALR (9.8 C/km)</text>
 <text class="legend-h" x="90" y="596">Stations (PST)</text>
-<text class="legend-row" x="90" y="612">La Cumbre @ 15:42 - 8.9C, winds 155, 10g24mph</text>
-<text class="legend-row" x="90" y="626">VOR @ 15:20 - 7.8C, winds 164, 7g16mph</text>
-<text class="legend-row" x="90" y="640">AntFarm @ 15:20 - 9.9C, winds 060, 9g15mph</text>
+<text class="legend-row" x="90" y="612">La Cumbre @ 15:50 - 8.9C, winds 169, 17g20mph</text>
+<text class="legend-row" x="90" y="626">VOR @ 15:30 - 7.6C, winds 171, 7g13mph</text>
+<text class="legend-row" x="90" y="640">AntFarm @ 15:30 - 9.9C, winds 060, 8g12mph</text>
 <text class="legend-row" x="90" y="654">Montecito @ 14:47 - 12.8C, winds 212, 2g17mph</text>
 <text class="legend-row" x="90" y="668">SM Pass @ 15:06 - 13.9C, winds 139, 8g17mph</text>
-<text class="legend-row" x="90" y="682">Upper Parma @ 15:20 - 15.4C, winds 192, 3g7mph</text>
-<text class="legend-row" x="90" y="696">Romero Cyn @ 15:20 - 14.2C, winds 152, 5g12mph</text>
-<text class="legend-row" x="90" y="710">Airport @ 15:30 - 16.0C, winds 240, 5g17mph</text>
+<text class="legend-row" x="90" y="682">Parma @ 15:30 - 15.0C, winds 199, 2g7mph</text>
+<text class="legend-row" x="90" y="696">Romero Cyn @ 15:30 - 14.5C, winds 159, 5g12mph</text>
+<text class="legend-row" x="90" y="710">Airport @ 15:40 - 16.0C, winds 220, 6g17mph</text>
 </svg>
