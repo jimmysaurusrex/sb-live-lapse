@@ -37,6 +37,7 @@ CSV_PATH = Path("madis_recent60_stations.csv")
 RASS_TEXT_PATH = Path("sba_latest.01t")
 STATE_PATH = Path("station_state.json")
 HISTORY_PATH = Path("station_history.json")
+SNAPSHOT_DIR = Path("snapshots")
 
 MS_TO_MPH = 2.23694
 FT_PER_M = 3.28084
@@ -569,6 +570,130 @@ def prune_history_snapshots(snapshots: List[Dict], now_utc: datetime) -> List[Di
     return [deduped[key] for key in sorted(deduped.keys())]
 
 
+def history_chart_paths(snapshots: List[Dict]) -> List[str]:
+    paths: List[str] = []
+    for snapshot in snapshots:
+        charts = snapshot.get("charts")
+        if not isinstance(charts, dict):
+            continue
+        for key in ("metric_svg", "imperial_svg"):
+            path = charts.get(key)
+            if isinstance(path, str) and path.startswith("snapshots/"):
+                paths.append(path)
+    return paths
+
+
+def cleanup_snapshot_files(keep_rel_paths: List[str]) -> None:
+    if not SNAPSHOT_DIR.exists():
+        return
+    keep = set(keep_rel_paths)
+    for file_path in SNAPSHOT_DIR.glob("*.svg"):
+        rel = file_path.as_posix()
+        if rel not in keep:
+            try:
+                file_path.unlink()
+            except OSError:
+                pass
+
+
+def snapshot_to_station_rows(snapshot: Dict) -> List[Dict]:
+    stations_map = snapshot.get("stations")
+    if not isinstance(stations_map, dict):
+        return []
+
+    out: List[Dict] = []
+    for station_id in STATIONS:
+        raw = stations_map.get(station_id)
+        if isinstance(raw, dict):
+            out.append(normalize_state_row(station_id, raw))
+        else:
+            out.append(blank_station_row(station_id))
+    return out
+
+
+def snapshot_to_rass_points(snapshot: Dict) -> List[Tuple[int, float]]:
+    rass = snapshot.get("rass")
+    if not isinstance(rass, dict):
+        return []
+    raw_points = rass.get("points_100m_c")
+    if not isinstance(raw_points, list):
+        return []
+
+    points: List[Tuple[int, float]] = []
+    for item in raw_points:
+        if not isinstance(item, list) or len(item) < 2:
+            continue
+        alt_raw, temp_raw = item[0], item[1]
+        try:
+            alt = int(round(float(alt_raw)))
+            temp = float(temp_raw)
+        except (TypeError, ValueError):
+            continue
+        points.append((alt, temp))
+    points.sort(key=lambda x: x[0])
+    return points
+
+
+def build_snapshot_svgs(snapshot: Dict) -> Optional[Tuple[str, str]]:
+    run_at = parse_iso_utc(snapshot.get("run_at"))
+    if run_at is None:
+        return None
+
+    rass_points = snapshot_to_rass_points(snapshot)
+    if len(rass_points) < 2:
+        return None
+
+    stations = snapshot_to_station_rows(snapshot)
+    if not stations:
+        return None
+
+    for row in stations:
+        update_age_and_recency(row, run_at)
+
+    vor = next((r for r in stations if r["id"] == "SE068"), None)
+    title_metric = build_lcl_title(vor, altitude_unit="m")
+    title_imperial = build_lcl_title(vor, altitude_unit="ft")
+
+    rass_obj = snapshot.get("rass") if isinstance(snapshot.get("rass"), dict) else {}
+    rass_hhmm = utc_iso_to_pst_hhmm(rass_obj.get("ob_time_utc")) or "missing"
+
+    metric_rass = convert_rass_points_units(rass_points, unit_system="metric")
+    metric_all = convert_station_rows_units(stations, unit_system="metric")
+    metric_recent = [r for r in metric_all if r.get("recent") and r.get("temp_c") is not None and r.get("elev_m") is not None]
+
+    imperial_rass = convert_rass_points_units(rass_points, unit_system="imperial")
+    imperial_all = convert_station_rows_units(stations, unit_system="imperial")
+    imperial_recent = [r for r in imperial_all if r.get("recent") and r.get("temp_c") is not None and r.get("elev_m") is not None]
+
+    metric_svg = draw_svg(
+        metric_rass,
+        metric_recent,
+        metric_all,
+        title_metric,
+        rass_hhmm,
+        temp_unit="C",
+        altitude_unit="m",
+        temp_suffix="C",
+        dalr_label="DALR (9.8 C/km)",
+        dalr_rate_per_1000=9.8,
+        y_tick_step=200,
+    )
+    imperial_svg = draw_svg(
+        imperial_rass,
+        imperial_recent,
+        imperial_all,
+        title_imperial,
+        rass_hhmm,
+        temp_unit="F",
+        altitude_unit="ft",
+        temp_suffix="F",
+        dalr_label="DALR (5.4 F/1000 ft)",
+        dalr_rate_per_1000=5.4,
+        y_tick_step=500,
+    )
+    return metric_svg, imperial_svg
+
+
 def age_minutes(iso_time: Optional[str], now_utc: datetime) -> Optional[float]:
     dt = parse_iso_utc(iso_time)
     if dt is None:
@@ -653,11 +778,32 @@ def write_station_history(
     rass_time_utc: Optional[str],
     rass_source: str,
     rass_points: List[Tuple[int, float]],
+    metric_svg: str,
+    imperial_svg: str,
 ) -> None:
+    def write_snapshot_chart_files(run_at_iso: str, metric_text: str, imperial_text: str) -> Tuple[str, str]:
+        run_dt = parse_iso_utc(run_at_iso)
+        if run_dt is None:
+            raise ValueError("invalid run_at timestamp")
+        snapshot_stamp = run_dt.strftime("%Y%m%dT%H%MZ")
+        SNAPSHOT_DIR.mkdir(parents=True, exist_ok=True)
+        metric_rel = f"snapshots/{snapshot_stamp}_metric.svg"
+        imperial_rel = f"snapshots/{snapshot_stamp}_imperial.svg"
+        Path(metric_rel).write_text(metric_text)
+        Path(imperial_rel).write_text(imperial_text)
+        return metric_rel, imperial_rel
+
+    run_at_iso = now_utc.strftime("%Y-%m-%dT%H:%M:%SZ")
+    metric_rel, imperial_rel = write_snapshot_chart_files(run_at_iso, metric_svg, imperial_svg)
+
     history = load_station_history()
     history.append(
         {
-            "run_at": now_utc.strftime("%Y-%m-%dT%H:%M:%SZ"),
+            "run_at": run_at_iso,
+            "charts": {
+                "metric_svg": metric_rel,
+                "imperial_svg": imperial_rel,
+            },
             "rass": {
                 "file": rass_filename,
                 "ob_time_utc": rass_time_utc,
@@ -668,6 +814,24 @@ def write_station_history(
         }
     )
     history = prune_history_snapshots(history, now_utc)
+
+    for snapshot in history:
+        charts = snapshot.get("charts") if isinstance(snapshot.get("charts"), dict) else {}
+        metric_existing = charts.get("metric_svg") if isinstance(charts, dict) else None
+        imperial_existing = charts.get("imperial_svg") if isinstance(charts, dict) else None
+        metric_ok = isinstance(metric_existing, str) and Path(metric_existing).exists()
+        imperial_ok = isinstance(imperial_existing, str) and Path(imperial_existing).exists()
+        if metric_ok and imperial_ok:
+            continue
+        rebuilt = build_snapshot_svgs(snapshot)
+        if rebuilt is None:
+            continue
+        metric_rel_built, imperial_rel_built = write_snapshot_chart_files(snapshot["run_at"], rebuilt[0], rebuilt[1])
+        snapshot["charts"] = {
+            "metric_svg": metric_rel_built,
+            "imperial_svg": imperial_rel_built,
+        }
+
     payload = {
         "generated_at": now_utc.strftime("%Y-%m-%dT%H:%M:%SZ"),
         "retention_hours": HISTORY_RETENTION_HOURS,
@@ -675,6 +839,7 @@ def write_station_history(
         "snapshots": history,
     }
     HISTORY_PATH.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n")
+    cleanup_snapshot_files(history_chart_paths(history))
 
 
 def c_to_f(temp_c: float) -> float:
@@ -1094,6 +1259,8 @@ def main() -> None:
         rass_time_utc=rass_time_utc,
         rass_source=rass_source,
         rass_points=rass_points,
+        metric_svg=svg_metric,
+        imperial_svg=svg_imperial,
     )
 
     print("rass_file=%s" % filename)

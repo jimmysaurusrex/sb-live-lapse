@@ -10,6 +10,8 @@
   <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 12px;">
     <button id="metricBtn" type="button" style="padding: 6px 10px; border: 1px solid #444; background: #111; color: #fff; border-radius: 4px; cursor: pointer;">Metric</button>
     <button id="imperialBtn" type="button" style="padding: 6px 10px; border: 1px solid #888; background: #fff; color: #222; border-radius: 4px; cursor: pointer;">Imperial</button>
+    <button id="prevSnapshotBtn" type="button" style="padding: 6px 10px; border: 1px solid #888; background: #fff; color: #222; border-radius: 4px; cursor: pointer;">&#8592;</button>
+    <button id="nextSnapshotBtn" type="button" style="padding: 6px 10px; border: 1px solid #888; background: #fff; color: #222; border-radius: 4px; cursor: pointer;">&#8594;</button>
   </div>
   <img id="chart" src="./sba_wwtemp_chart_metric.svg" alt="Santa Barbara lapse chart" style="max-width: 100%; height: auto;" />
   <script>
@@ -20,46 +22,149 @@
       var title = document.getElementById("chartTitle");
       var metricBtn = document.getElementById("metricBtn");
       var imperialBtn = document.getElementById("imperialBtn");
+      var prevBtn = document.getElementById("prevSnapshotBtn");
+      var nextBtn = document.getElementById("nextSnapshotBtn");
       var storageKey = "sb_units";
-      var sources = {
+      var latestSources = {
         metric: "./sba_wwtemp_chart_metric.svg?v=" + slot,
         imperial: "./sba_wwtemp_chart_imperial.svg?v=" + slot
       };
+      var state = {
+        unit: "metric",
+        snapshots: [],
+        index: -1
+      };
+      var fetchedLatestTitle = false;
 
-      function setActive(unit) {
-        var isMetric = unit === "metric";
-        img.src = sources[unit];
+      function formatPstHHMM(isoTime) {
+        if (!isoTime) return null;
+        var dt = new Date(isoTime);
+        if (isNaN(dt.getTime())) return null;
+        return new Intl.DateTimeFormat("en-US", {
+          hour: "2-digit",
+          minute: "2-digit",
+          hour12: false,
+          timeZone: "America/Los_Angeles"
+        }).format(dt);
+      }
+
+      function setTitleForIso(isoTime) {
+        var hhmm = formatPstHHMM(isoTime);
+        if (!hhmm) return false;
+        title.textContent = "Santa Barbara Lapse Chart (Refreshed at " + hhmm + ")";
+        return true;
+      }
+
+      function updateUnitButtons() {
+        var isMetric = state.unit === "metric";
         metricBtn.style.background = isMetric ? "#111" : "#fff";
         metricBtn.style.color = isMetric ? "#fff" : "#222";
         metricBtn.style.borderColor = isMetric ? "#444" : "#888";
         imperialBtn.style.background = isMetric ? "#fff" : "#111";
         imperialBtn.style.color = isMetric ? "#222" : "#fff";
         imperialBtn.style.borderColor = isMetric ? "#888" : "#444";
-        try { localStorage.setItem(storageKey, unit); } catch (e) {}
       }
 
-      metricBtn.addEventListener("click", function () { setActive("metric"); });
-      imperialBtn.addEventListener("click", function () { setActive("imperial"); });
+      function setNavButtonDisabled(btn, disabled) {
+        btn.disabled = disabled;
+        btn.style.opacity = disabled ? "0.45" : "1";
+        btn.style.cursor = disabled ? "default" : "pointer";
+      }
 
-      var saved = "metric";
+      function updateNavButtons() {
+        var hasSnapshots = state.snapshots.length > 0;
+        setNavButtonDisabled(prevBtn, !hasSnapshots || state.index <= 0);
+        setNavButtonDisabled(nextBtn, !hasSnapshots || state.index >= state.snapshots.length - 1);
+      }
+
+      function currentSnapshot() {
+        if (state.index < 0 || state.index >= state.snapshots.length) return null;
+        return state.snapshots[state.index];
+      }
+
+      function sourceForSnapshot(snapshot, unit) {
+        if (snapshot && snapshot.charts) {
+          var key = unit === "imperial" ? "imperial_svg" : "metric_svg";
+          var value = snapshot.charts[key];
+          if (typeof value === "string" && value) {
+            var token = snapshot.run_at || String(slot);
+            var sep = value.indexOf("?") === -1 ? "?" : "&";
+            return value + sep + "v=" + encodeURIComponent(token);
+          }
+        }
+        return latestSources[unit];
+      }
+
+      function fetchLatestTitle() {
+        if (fetchedLatestTitle) return;
+        fetchedLatestTitle = true;
+        fetch("./station_state.json?v=" + slot, { cache: "no-store" })
+          .then(function (resp) { return resp.ok ? resp.json() : null; })
+          .then(function (latestState) {
+            if (!latestState || !latestState.generated_at) return;
+            setTitleForIso(latestState.generated_at);
+          })
+          .catch(function () {});
+      }
+
+      function render() {
+        updateUnitButtons();
+        updateNavButtons();
+        var snapshot = currentSnapshot();
+        img.src = sourceForSnapshot(snapshot, state.unit);
+        if (!snapshot || !setTitleForIso(snapshot.run_at)) {
+          fetchLatestTitle();
+        }
+      }
+
+      function setUnit(unit) {
+        state.unit = unit === "imperial" ? "imperial" : "metric";
+        try { localStorage.setItem(storageKey, state.unit); } catch (e) {}
+        render();
+      }
+
+      metricBtn.addEventListener("click", function () { setUnit("metric"); });
+      imperialBtn.addEventListener("click", function () { setUnit("imperial"); });
+      prevBtn.addEventListener("click", function () {
+        if (state.index > 0) {
+          state.index -= 1;
+          render();
+        }
+      });
+      nextBtn.addEventListener("click", function () {
+        if (state.index < state.snapshots.length - 1) {
+          state.index += 1;
+          render();
+        }
+      });
+
       try {
         var raw = localStorage.getItem(storageKey);
-        if (raw === "imperial") saved = "imperial";
+        if (raw === "imperial") state.unit = "imperial";
       } catch (e) {}
-      setActive(saved);
+      render();
 
-      fetch("./station_state.json?v=" + slot, { cache: "no-store" })
+      fetch("./station_history.json?v=" + slot, { cache: "no-store" })
         .then(function (resp) { return resp.ok ? resp.json() : null; })
-        .then(function (state) {
-          if (!state || !state.generated_at) return;
-          var dt = new Date(state.generated_at);
-          var hhmm = new Intl.DateTimeFormat("en-US", {
-            hour: "2-digit",
-            minute: "2-digit",
-            hour12: false,
-            timeZone: "America/Los_Angeles"
-          }).format(dt);
-          title.textContent = "Santa Barbara Lapse Chart (Refreshed at " + hhmm + ")";
+        .then(function (historyPayload) {
+          var snapshots = [];
+          if (historyPayload && Array.isArray(historyPayload.snapshots)) {
+            snapshots = historyPayload.snapshots.filter(function (snap) {
+              return !!(
+                snap &&
+                typeof snap.run_at === "string" &&
+                snap.charts &&
+                typeof snap.charts.metric_svg === "string" &&
+                typeof snap.charts.imperial_svg === "string"
+              );
+            });
+          }
+          snapshots.sort(function (a, b) {
+            return a.run_at < b.run_at ? -1 : (a.run_at > b.run_at ? 1 : 0);
+          });
+          state.snapshots = snapshots;
+          state.index = snapshots.length ? snapshots.length - 1 : -1;
+          render();
         })
         .catch(function () {});
     })();

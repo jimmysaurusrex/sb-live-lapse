@@ -39,6 +39,7 @@ jobs:
           cp sba_wwtemp_chart_imperial.svg site/
           cp station_state.json site/
           cp station_history.json site/
+          if [ -d snapshots ]; then cp -R snapshots site/; fi
 
       - uses: actions/upload-pages-artifact@v4
         with:

@@ -1,9 +1,13 @@
 {
-  "generated_at": "2026-02-15T00:17:44Z",
+  "generated_at": "2026-02-15T01:26:35Z",
   "retention_hours": 48,
-  "snapshot_count": 2,
+  "snapshot_count": 4,
   "snapshots": [
     {
+      "charts": {
+        "imperial_svg": "snapshots/20260215T0014Z_imperial.svg",
+        "metric_svg": "snapshots/20260215T0014Z_metric.svg"
+      },
       "rass": {
         "file": "sba26045.23t",
         "ob_time_utc": "2026-02-14T23:55:29",
@@ -160,6 +164,10 @@
       }
     },
     {
+      "charts": {
+        "imperial_svg": "snapshots/20260215T0017Z_imperial.svg",
+        "metric_svg": "snapshots/20260215T0017Z_metric.svg"
+      },
       "rass": {
         "file": "sba26045.23t",
         "ob_time_utc": "2026-02-14T23:55:29",
@@ -312,6 +320,334 @@
           "wind_gust_mps": 3.92,
           "wind_ob_time": "2026-02-15T00:00",
           "wind_spd_mps": 2.176
+        }
+      }
+    },
+    {
+      "charts": {
+        "imperial_svg": "snapshots/20260215T0120Z_imperial.svg",
+        "metric_svg": "snapshots/20260215T0120Z_metric.svg"
+      },
+      "rass": {
+        "file": "sba26046.00t",
+        "ob_time_utc": "2026-02-15T00:55:08",
+        "points_100m_c": [
+          [
+            200,
+            13.794
+          ],
+          [
+            300,
+            13.223
+          ],
+          [
+            400,
+            12.834
+          ],
+          [
+            500,
+            12.453
+          ],
+          [
+            600,
+            12.072
+          ],
+          [
+            700,
+            11.537
+          ],
+          [
+            800,
+            10.749
+          ],
+          [
+            900,
+            9.824
+          ],
+          [
+            1000,
+            9.056
+          ],
+          [
+            1100,
+            8.682
+          ],
+          [
+            1200,
+            8.491
+          ]
+        ],
+        "source": "live"
+      },
+      "run_at": "2026-02-15T01:20:55Z",
+      "stations": {
+        "421SE": {
+          "dew_c": 11.249994000000015,
+          "elev_m": 237.7,
+          "id": "421SE",
+          "name": "Parma",
+          "provider": "MesoWest",
+          "temp_c": 13.661005000000046,
+          "temp_ob_time": "2026-02-15T01:00",
+          "wind_dir": 203.800003,
+          "wind_gust_mps": 1.991,
+          "wind_ob_time": "2026-02-15T01:00",
+          "wind_spd_mps": 0.386
+        },
+        "KC6OYN": {
+          "dew_c": 5.070835681965675,
+          "elev_m": 1201.0,
+          "id": "KC6OYN",
+          "name": "La Cumbre",
+          "provider": "CWOP-findU",
+          "temp_c": 7.777777777777779,
+          "temp_ob_time": "2026-02-15T01:18",
+          "wind_dir": 174.0,
+          "wind_gust_mps": 9.387824438742209,
+          "wind_ob_time": "2026-02-15T01:18",
+          "wind_spd_mps": 5.364471107852691
+        },
+        "KSBA": {
+          "dew_c": 10.999994000000015,
+          "elev_m": 3.0,
+          "id": "KSBA",
+          "name": "Airport",
+          "provider": "ASOS-HFM (last-good)",
+          "temp_c": 13.999994000000015,
+          "temp_ob_time": "2026-02-15T01:05",
+          "wind_dir": 250.0,
+          "wind_gust_mps": 7.716667,
+          "wind_ob_time": "2026-02-15T01:05",
+          "wind_spd_mps": 1.543333
+        },
+        "MPWC1": {
+          "dew_c": 11.010004000000038,
+          "elev_m": 454.5,
+          "id": "MPWC1",
+          "name": "SM Pass",
+          "provider": null,
+          "temp_c": 12.778008999999997,
+          "temp_ob_time": "2026-02-15T00:06",
+          "wind_dir": 152.0,
+          "wind_gust_mps": 7.151,
+          "wind_ob_time": "2026-02-15T00:06",
+          "wind_spd_mps": 1.79
+        },
+        "MTIC1": {
+          "dew_c": null,
+          "elev_m": 493.5,
+          "id": "MTIC1",
+          "name": "Montecito",
+          "provider": "RAWS",
+          "temp_c": 11.110986000000025,
+          "temp_ob_time": "2026-02-15T00:47",
+          "wind_dir": 203.0,
+          "wind_gust_mps": 5.366,
+          "wind_ob_time": "2026-02-15T00:47",
+          "wind_spd_mps": 1.343
+        },
+        "SE053": {
+          "dew_c": 11.45000600000003,
+          "elev_m": 256.9,
+          "id": "SE053",
+          "name": "Romero Cyn",
+          "provider": "MesoWest",
+          "temp_c": 13.327997000000039,
+          "temp_ob_time": "2026-02-15T01:00",
+          "wind_dir": 135.5,
+          "wind_gust_mps": 3.035,
+          "wind_ob_time": "2026-02-15T01:00",
+          "wind_spd_mps": 1.255
+        },
+        "SE068": {
+          "dew_c": 7.040002000000015,
+          "elev_m": 1069.9,
+          "id": "SE068",
+          "name": "VOR",
+          "provider": "MesoWest",
+          "temp_c": 7.156000000000006,
+          "temp_ob_time": "2026-02-15T01:00",
+          "wind_dir": 177.600006,
+          "wind_gust_mps": 6.106,
+          "wind_ob_time": "2026-02-15T01:00",
+          "wind_spd_mps": 3.102
+        },
+        "SE234": {
+          "dew_c": 9.490015000000028,
+          "elev_m": 717.8,
+          "id": "SE234",
+          "name": "AntFarm",
+          "provider": "MesoWest",
+          "temp_c": 9.494011999999998,
+          "temp_ob_time": "2026-02-15T01:00",
+          "wind_dir": 60.299999,
+          "wind_gust_mps": 4.64,
+          "wind_ob_time": "2026-02-15T01:00",
+          "wind_spd_mps": 2.989
+        }
+      }
+    },
+    {
+      "charts": {
+        "imperial_svg": "snapshots/20260215T0126Z_imperial.svg",
+        "metric_svg": "snapshots/20260215T0126Z_metric.svg"
+      },
+      "rass": {
+        "file": "sba26046.00t",
+        "ob_time_utc": "2026-02-15T00:55:08",
+        "points_100m_c": [
+          [
+            200,
+            13.794
+          ],
+          [
+            300,
+            13.223
+          ],
+          [
+            400,
+            12.834
+          ],
+          [
+            500,
+            12.453
+          ],
+          [
+            600,
+            12.072
+          ],
+          [
+            700,
+            11.537
+          ],
+          [
+            800,
+            10.749
+          ],
+          [
+            900,
+            9.824
+          ],
+          [
+            1000,
+            9.056
+          ],
+          [
+            1100,
+            8.682
+          ],
+          [
+            1200,
+            8.491
+          ]
+        ],
+        "source": "live"
+      },
+      "run_at": "2026-02-15T01:26:35Z",
+      "stations": {
+        "421SE": {
+          "dew_c": 11.279993000000047,
+          "elev_m": 237.7,
+          "id": "421SE",
+          "name": "Parma",
+          "provider": "MesoWest",
+          "temp_c": 13.593988000000024,
+          "temp_ob_time": "2026-02-15T01:10",
+          "wind_dir": 176.600006,
+          "wind_gust_mps": 1.471,
+          "wind_ob_time": "2026-02-15T01:10",
+          "wind_spd_mps": 0.35
+        },
+        "KC6OYN": {
+          "dew_c": 4.527194048824796,
+          "elev_m": 1201.0,
+          "id": "KC6OYN",
+          "name": "La Cumbre",
+          "provider": "CWOP-findU",
+          "temp_c": 7.222222222222222,
+          "temp_ob_time": "2026-02-15T01:26",
+          "wind_dir": 143.0,
+          "wind_gust_mps": 7.5996674027913125,
+          "wind_ob_time": "2026-02-15T01:26",
+          "wind_spd_mps": 6.25854962582814
+        },
+        "KSBA": {
+          "dew_c": 10.999994000000015,
+          "elev_m": 3.0,
+          "id": "KSBA",
+          "name": "Airport",
+          "provider": "ASOS-HFM (last-good)",
+          "temp_c": 13.999994000000015,
+          "temp_ob_time": "2026-02-15T01:10",
+          "wind_dir": 260.0,
+          "wind_gust_mps": 7.716667,
+          "wind_ob_time": "2026-02-15T01:10",
+          "wind_spd_mps": 2.057778
+        },
+        "MPWC1": {
+          "dew_c": 10.570001000000047,
+          "elev_m": 454.5,
+          "id": "MPWC1",
+          "name": "SM Pass",
+          "provider": "RAWS",
+          "temp_c": 11.666986000000009,
+          "temp_ob_time": "2026-02-15T01:06",
+          "wind_dir": 146.0,
+          "wind_gust_mps": 5.366,
+          "wind_ob_time": "2026-02-15T01:06",
+          "wind_spd_mps": 2.233
+        },
+        "MTIC1": {
+          "dew_c": null,
+          "elev_m": 493.5,
+          "id": "MTIC1",
+          "name": "Montecito",
+          "provider": "RAWS",
+          "temp_c": 11.110986000000025,
+          "temp_ob_time": "2026-02-15T00:47",
+          "wind_dir": 203.0,
+          "wind_gust_mps": 5.366,
+          "wind_ob_time": "2026-02-15T00:47",
+          "wind_spd_mps": 1.343
+        },
+        "SE053": {
+          "dew_c": 11.399988000000008,
+          "elev_m": 256.9,
+          "id": "SE053",
+          "name": "Romero Cyn",
+          "provider": "MesoWest",
+          "temp_c": 13.310999000000038,
+          "temp_ob_time": "2026-02-15T01:10",
+          "wind_dir": 146.899994,
+          "wind_gust_mps": 2.485,
+          "wind_ob_time": "2026-02-15T01:10",
+          "wind_spd_mps": 1.363
+        },
+        "SE068": {
+          "dew_c": 6.740015000000028,
+          "elev_m": 1069.9,
+          "id": "SE068",
+          "name": "VOR",
+          "provider": "MesoWest",
+          "temp_c": 6.843988000000024,
+          "temp_ob_time": "2026-02-15T01:10",
+          "wind_dir": 157.100006,
+          "wind_gust_mps": 7.285,
+          "wind_ob_time": "2026-02-15T01:10",
+          "wind_spd_mps": 3.632
+        },
+        "SE234": {
+          "dew_c": 9.490015000000028,
+          "elev_m": 717.8,
+          "id": "SE234",
+          "name": "AntFarm",
+          "provider": "MesoWest (last-good)",
+          "temp_c": 9.494011999999998,
+          "temp_ob_time": "2026-02-15T01:00",
+          "wind_dir": 57.380001,
+          "wind_gust_mps": 4.378,
+          "wind_ob_time": "2026-02-15T01:10",
+          "wind_spd_mps": 2.865
         }
       }
     }
