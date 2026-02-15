@@ -1,0 +1,319 @@
+{
+  "generated_at": "2026-02-15T00:17:44Z",
+  "retention_hours": 48,
+  "snapshot_count": 2,
+  "snapshots": [
+    {
+      "rass": {
+        "file": "sba26045.23t",
+        "ob_time_utc": "2026-02-14T23:55:29",
+        "points_100m_c": [
+          [
+            200,
+            13.899
+          ],
+          [
+            300,
+            13.804
+          ],
+          [
+            400,
+            13.343
+          ],
+          [
+            500,
+            13.3
+          ],
+          [
+            600,
+            12.235
+          ],
+          [
+            700,
+            11.306
+          ],
+          [
+            800,
+            10.81
+          ],
+          [
+            900,
+            10.294
+          ],
+          [
+            1000,
+            9.592
+          ],
+          [
+            1100,
+            9.064
+          ]
+        ],
+        "source": "live"
+      },
+      "run_at": "2026-02-15T00:14:58Z",
+      "stations": {
+        "421SE": {
+          "dew_c": 11.64000900000002,
+          "elev_m": 237.7,
+          "id": "421SE",
+          "name": "Parma",
+          "provider": "MesoWest",
+          "temp_c": 14.249994000000015,
+          "temp_ob_time": "2026-02-15T00:00",
+          "wind_dir": 199.899994,
+          "wind_gust_mps": 3.133,
+          "wind_ob_time": "2026-02-15T00:00",
+          "wind_spd_mps": 1.049
+        },
+        "KC6OYN": {
+          "dew_c": 5.804935688302587,
+          "elev_m": 1201.0,
+          "id": "KC6OYN",
+          "name": "La Cumbre",
+          "provider": "CWOP-findU",
+          "temp_c": 8.88888888888889,
+          "temp_ob_time": "2026-02-15T00:14",
+          "wind_dir": 161.0,
+          "wind_gust_mps": 8.046706661779037,
+          "wind_ob_time": "2026-02-15T00:14",
+          "wind_spd_mps": 5.811510366840415
+        },
+        "KSBA": {
+          "dew_c": 10.999994000000015,
+          "elev_m": 3.0,
+          "id": "KSBA",
+          "name": "Airport",
+          "provider": "ASOS-HFM (last-good)",
+          "temp_c": 15.999994000000015,
+          "temp_ob_time": "2026-02-15T00:00",
+          "wind_dir": 250.0,
+          "wind_gust_mps": 7.716667,
+          "wind_ob_time": "2026-02-15T00:00",
+          "wind_spd_mps": 2.057778
+        },
+        "MPWC1": {
+          "dew_c": 10.490015000000028,
+          "elev_m": 454.5,
+          "id": "MPWC1",
+          "name": "SM Pass",
+          "provider": null,
+          "temp_c": 13.889001000000007,
+          "temp_ob_time": "2026-02-14T23:06",
+          "wind_dir": 139.0,
+          "wind_gust_mps": 7.598,
+          "wind_ob_time": "2026-02-14T23:06",
+          "wind_spd_mps": 3.575
+        },
+        "MTIC1": {
+          "dew_c": null,
+          "elev_m": 493.5,
+          "id": "MTIC1",
+          "name": "Montecito",
+          "provider": "RAWS",
+          "temp_c": 12.778008999999997,
+          "temp_ob_time": "2026-02-14T23:47",
+          "wind_dir": 192.0,
+          "wind_gust_mps": 6.703,
+          "wind_ob_time": "2026-02-14T23:47",
+          "wind_spd_mps": 2.233
+        },
+        "SE053": {
+          "dew_c": 11.920006999999998,
+          "elev_m": 256.9,
+          "id": "SE053",
+          "name": "Romero Cyn",
+          "provider": "MesoWest",
+          "temp_c": 14.300012000000038,
+          "temp_ob_time": "2026-02-15T00:00",
+          "wind_dir": 133.699997,
+          "wind_gust_mps": 4.08,
+          "wind_ob_time": "2026-02-15T00:00",
+          "wind_spd_mps": 2.125
+        },
+        "SE068": {
+          "dew_c": 7.399988000000008,
+          "elev_m": 1069.9,
+          "id": "SE068",
+          "name": "VOR",
+          "provider": "MesoWest",
+          "temp_c": 7.572015000000022,
+          "temp_ob_time": "2026-02-15T00:00",
+          "wind_dir": 171.0,
+          "wind_gust_mps": 6.924,
+          "wind_ob_time": "2026-02-15T00:00",
+          "wind_spd_mps": 2.86
+        },
+        "SE234": {
+          "dew_c": 9.83999,
+          "elev_m": 717.8,
+          "id": "SE234",
+          "name": "AntFarm",
+          "provider": "MesoWest",
+          "temp_c": 9.843988000000024,
+          "temp_ob_time": "2026-02-15T00:00",
+          "wind_dir": 55.509998,
+          "wind_gust_mps": 3.92,
+          "wind_ob_time": "2026-02-15T00:00",
+          "wind_spd_mps": 2.176
+        }
+      }
+    },
+    {
+      "rass": {
+        "file": "sba26045.23t",
+        "ob_time_utc": "2026-02-14T23:55:29",
+        "points_100m_c": [
+          [
+            200,
+            13.899
+          ],
+          [
+            300,
+            13.804
+          ],
+          [
+            400,
+            13.343
+          ],
+          [
+            500,
+            13.3
+          ],
+          [
+            600,
+            12.235
+          ],
+          [
+            700,
+            11.306
+          ],
+          [
+            800,
+            10.81
+          ],
+          [
+            900,
+            10.294
+          ],
+          [
+            1000,
+            9.592
+          ],
+          [
+            1100,
+            9.064
+          ]
+        ],
+        "source": "live"
+      },
+      "run_at": "2026-02-15T00:17:44Z",
+      "stations": {
+        "421SE": {
+          "dew_c": 11.64000900000002,
+          "elev_m": 237.7,
+          "id": "421SE",
+          "name": "Parma",
+          "provider": "MesoWest",
+          "temp_c": 14.249994000000015,
+          "temp_ob_time": "2026-02-15T00:00",
+          "wind_dir": 199.899994,
+          "wind_gust_mps": 3.133,
+          "wind_ob_time": "2026-02-15T00:00",
+          "wind_spd_mps": 1.049
+        },
+        "KC6OYN": {
+          "dew_c": 5.804935688302587,
+          "elev_m": 1201.0,
+          "id": "KC6OYN",
+          "name": "La Cumbre",
+          "provider": "CWOP-findU",
+          "temp_c": 8.88888888888889,
+          "temp_ob_time": "2026-02-15T00:14",
+          "wind_dir": 161.0,
+          "wind_gust_mps": 8.046706661779037,
+          "wind_ob_time": "2026-02-15T00:14",
+          "wind_spd_mps": 5.811510366840415
+        },
+        "KSBA": {
+          "dew_c": 10.999994000000015,
+          "elev_m": 3.0,
+          "id": "KSBA",
+          "name": "Airport",
+          "provider": "ASOS-HFM (last-good)",
+          "temp_c": 15.999994000000015,
+          "temp_ob_time": "2026-02-15T00:05",
+          "wind_dir": 240.0,
+          "wind_gust_mps": 7.716667,
+          "wind_ob_time": "2026-02-15T00:05",
+          "wind_spd_mps": 2.572222
+        },
+        "MPWC1": {
+          "dew_c": 10.490015000000028,
+          "elev_m": 454.5,
+          "id": "MPWC1",
+          "name": "SM Pass",
+          "provider": null,
+          "temp_c": 13.889001000000007,
+          "temp_ob_time": "2026-02-14T23:06",
+          "wind_dir": 139.0,
+          "wind_gust_mps": 7.598,
+          "wind_ob_time": "2026-02-14T23:06",
+          "wind_spd_mps": 3.575
+        },
+        "MTIC1": {
+          "dew_c": null,
+          "elev_m": 493.5,
+          "id": "MTIC1",
+          "name": "Montecito",
+          "provider": "RAWS",
+          "temp_c": 12.778008999999997,
+          "temp_ob_time": "2026-02-14T23:47",
+          "wind_dir": 192.0,
+          "wind_gust_mps": 6.703,
+          "wind_ob_time": "2026-02-14T23:47",
+          "wind_spd_mps": 2.233
+        },
+        "SE053": {
+          "dew_c": 11.920006999999998,
+          "elev_m": 256.9,
+          "id": "SE053",
+          "name": "Romero Cyn",
+          "provider": "MesoWest",
+          "temp_c": 14.300012000000038,
+          "temp_ob_time": "2026-02-15T00:00",
+          "wind_dir": 133.699997,
+          "wind_gust_mps": 4.08,
+          "wind_ob_time": "2026-02-15T00:00",
+          "wind_spd_mps": 2.125
+        },
+        "SE068": {
+          "dew_c": 7.399988000000008,
+          "elev_m": 1069.9,
+          "id": "SE068",
+          "name": "VOR",
+          "provider": "MesoWest",
+          "temp_c": 7.572015000000022,
+          "temp_ob_time": "2026-02-15T00:00",
+          "wind_dir": 171.0,
+          "wind_gust_mps": 6.924,
+          "wind_ob_time": "2026-02-15T00:00",
+          "wind_spd_mps": 2.86
+        },
+        "SE234": {
+          "dew_c": 9.83999,
+          "elev_m": 717.8,
+          "id": "SE234",
+          "name": "AntFarm",
+          "provider": "MesoWest",
+          "temp_c": 9.843988000000024,
+          "temp_ob_time": "2026-02-15T00:00",
+          "wind_dir": 55.509998,
+          "wind_gust_mps": 3.92,
+          "wind_ob_time": "2026-02-15T00:00",
+          "wind_spd_mps": 2.176
+        }
+      }
+    }
+  ]
+}

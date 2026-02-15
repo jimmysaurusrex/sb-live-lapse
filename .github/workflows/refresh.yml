@@ -38,6 +38,7 @@ jobs:
           cp sba_wwtemp_chart_metric.svg site/
           cp sba_wwtemp_chart_imperial.svg site/
           cp station_state.json site/
+          cp station_history.json site/
 
       - uses: actions/upload-pages-artifact@v4
         with:

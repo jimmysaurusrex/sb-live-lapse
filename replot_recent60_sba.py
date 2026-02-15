@@ -36,6 +36,7 @@ CHART_IMPERIAL_PATH = Path("sba_wwtemp_chart_imperial.svg")
 CSV_PATH = Path("madis_recent60_stations.csv")
 RASS_TEXT_PATH = Path("sba_latest.01t")
 STATE_PATH = Path("station_state.json")
+HISTORY_PATH = Path("station_history.json")
 
 MS_TO_MPH = 2.23694
 FT_PER_M = 3.28084
@@ -47,6 +48,8 @@ CWOP_ELEV_M = {
 }
 LAST_GOOD_GRACE_MIN = 90.0
 DEFAULT_DEPLOYED_STATE_URL = "https://jimmysaurusrex.github.io/sb-live-lapse/station_state.json"
+DEFAULT_DEPLOYED_HISTORY_URL = "https://jimmysaurusrex.github.io/sb-live-lapse/station_history.json"
+HISTORY_RETENTION_HOURS = 48
 RASS_LIST_RETRIES = 3
 RASS_FILE_RETRIES = 2
 RASS_CANDIDATE_COUNT = 5
@@ -299,8 +302,16 @@ def parse_float(raw: Optional[str]) -> Optional[float]:
 def parse_iso_utc(iso_time: Optional[str]) -> Optional[datetime]:
     if not iso_time:
         return None
-    fmt = "%Y-%m-%dT%H:%M:%S" if len(iso_time) == 19 else "%Y-%m-%dT%H:%M"
-    return datetime.strptime(iso_time, fmt).replace(tzinfo=timezone.utc)
+    normalized = iso_time.strip()
+    if not normalized:
+        return None
+    try:
+        dt = datetime.fromisoformat(normalized.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    if dt.tzinfo is None:
+        return dt.replace(tzinfo=timezone.utc)
+    return dt.astimezone(timezone.utc)
 
 
 def dewpoint_c_from_temp_rh(temp_c: float, rh_pct: float) -> Optional[float]:
@@ -427,6 +438,17 @@ def state_url_from_env() -> Optional[str]:
     return DEFAULT_DEPLOYED_STATE_URL
 
 
+def history_url_from_env() -> Optional[str]:
+    direct = os.getenv("SB_DEPLOYED_HISTORY_URL")
+    if direct:
+        return direct
+    repo = os.getenv("GITHUB_REPOSITORY", "")
+    if "/" in repo:
+        owner, name = repo.split("/", 1)
+        return f"https://{owner}.github.io/{name}/station_history.json"
+    return DEFAULT_DEPLOYED_HISTORY_URL
+
+
 def normalize_state_row(station_id: str, raw: Dict) -> Dict:
     row = blank_station_row(station_id)
     row["name"] = str(raw.get("name") or row["name"])
@@ -466,6 +488,32 @@ def parse_state_payload(text: str) -> Dict[str, Dict]:
     return out
 
 
+def parse_history_payload(text: str) -> List[Dict]:
+    try:
+        payload = json.loads(text)
+    except Exception:
+        return []
+
+    snapshots = payload if isinstance(payload, list) else payload.get("snapshots")
+    if not isinstance(snapshots, list):
+        return []
+
+    out: List[Dict] = []
+    for snapshot in snapshots:
+        if not isinstance(snapshot, dict):
+            continue
+        run_at_raw = snapshot.get("run_at") or snapshot.get("generated_at")
+        if not isinstance(run_at_raw, str):
+            continue
+        run_dt = parse_iso_utc(run_at_raw)
+        if run_dt is None:
+            continue
+        normalized = dict(snapshot)
+        normalized["run_at"] = run_dt.strftime("%Y-%m-%dT%H:%M:%SZ")
+        out.append(normalized)
+    return out
+
+
 def load_last_good_state() -> Dict[str, Dict]:
     url = state_url_from_env()
     if not url:
@@ -482,6 +530,43 @@ def load_last_good_state() -> Dict[str, Dict]:
         if parsed:
             return parsed
     return {}
+
+
+def load_station_history() -> List[Dict]:
+    url = history_url_from_env()
+    if not url:
+        url = DEFAULT_DEPLOYED_HISTORY_URL
+    try:
+        parsed = parse_history_payload(fetch_text(url, timeout=15))
+        if parsed:
+            return parsed
+    except Exception:
+        pass
+
+    if HISTORY_PATH.exists():
+        parsed = parse_history_payload(HISTORY_PATH.read_text())
+        if parsed:
+            return parsed
+    return []
+
+
+def prune_history_snapshots(snapshots: List[Dict], now_utc: datetime) -> List[Dict]:
+    cutoff = now_utc - timedelta(hours=HISTORY_RETENTION_HOURS)
+    deduped: Dict[str, Dict] = {}
+
+    for snapshot in snapshots:
+        run_at_raw = snapshot.get("run_at")
+        if not isinstance(run_at_raw, str):
+            continue
+        run_dt = parse_iso_utc(run_at_raw)
+        if run_dt is None or run_dt < cutoff:
+            continue
+        run_at = run_dt.strftime("%Y-%m-%dT%H:%M:%SZ")
+        normalized = dict(snapshot)
+        normalized["run_at"] = run_at
+        deduped[run_at] = normalized
+
+    return [deduped[key] for key in sorted(deduped.keys())]
 
 
 def age_minutes(iso_time: Optional[str], now_utc: datetime) -> Optional[float]:
@@ -535,26 +620,61 @@ def apply_last_good_fallback(current_row: Dict, cached_row: Dict, now_utc: datet
     return merged
 
 
+def station_payload(row: Dict) -> Dict:
+    return {
+        "id": row["id"],
+        "name": row.get("name"),
+        "elev_m": row.get("elev_m"),
+        "temp_c": row.get("temp_c"),
+        "dew_c": row.get("dew_c"),
+        "temp_ob_time": row.get("temp_ob_time"),
+        "provider": row.get("provider"),
+        "wind_dir": row.get("wind_dir"),
+        "wind_spd_mps": row.get("wind_spd_mps"),
+        "wind_gust_mps": row.get("wind_gust_mps"),
+        "wind_ob_time": row.get("wind_ob_time"),
+    }
+
+
 def write_station_state(stations: List[Dict], now_utc: datetime) -> None:
     state = {
         "generated_at": now_utc.strftime("%Y-%m-%dT%H:%M:%SZ"),
         "stations": {},
     }
     for row in stations:
-        state["stations"][row["id"]] = {
-            "id": row["id"],
-            "name": row.get("name"),
-            "elev_m": row.get("elev_m"),
-            "temp_c": row.get("temp_c"),
-            "dew_c": row.get("dew_c"),
-            "temp_ob_time": row.get("temp_ob_time"),
-            "provider": row.get("provider"),
-            "wind_dir": row.get("wind_dir"),
-            "wind_spd_mps": row.get("wind_spd_mps"),
-            "wind_gust_mps": row.get("wind_gust_mps"),
-            "wind_ob_time": row.get("wind_ob_time"),
-    }
+        state["stations"][row["id"]] = station_payload(row)
     STATE_PATH.write_text(json.dumps(state, indent=2, sort_keys=True) + "\n")
+
+
+def write_station_history(
+    stations: List[Dict],
+    now_utc: datetime,
+    rass_filename: str,
+    rass_time_utc: Optional[str],
+    rass_source: str,
+    rass_points: List[Tuple[int, float]],
+) -> None:
+    history = load_station_history()
+    history.append(
+        {
+            "run_at": now_utc.strftime("%Y-%m-%dT%H:%M:%SZ"),
+            "rass": {
+                "file": rass_filename,
+                "ob_time_utc": rass_time_utc,
+                "points_100m_c": [[int(alt_m), round(temp_c, 3)] for alt_m, temp_c in rass_points],
+                "source": rass_source,
+            },
+            "stations": {row["id"]: station_payload(row) for row in stations},
+        }
+    )
+    history = prune_history_snapshots(history, now_utc)
+    payload = {
+        "generated_at": now_utc.strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "retention_hours": HISTORY_RETENTION_HOURS,
+        "snapshot_count": len(history),
+        "snapshots": history,
+    }
+    HISTORY_PATH.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n")
 
 
 def c_to_f(temp_c: float) -> float:
@@ -967,6 +1087,14 @@ def main() -> None:
 
     CSV_PATH.write_text("\n".join(csv_lines) + "\n")
     write_station_state(stations, now_utc)
+    write_station_history(
+        stations,
+        now_utc,
+        rass_filename=filename,
+        rass_time_utc=rass_time_utc,
+        rass_source=rass_source,
+        rass_points=rass_points,
+    )
 
     print("rass_file=%s" % filename)
     print("rass_source=%s" % rass_source)
