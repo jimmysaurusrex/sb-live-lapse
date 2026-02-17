@@ -13,7 +13,7 @@ from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
 
-STATIONS = ["KC6OYN", "SE068", "SE234", "MTIC1", "MPWC1", "421SE", "SE053", "KSBA"]
+STATIONS = ["KC6OYN", "SE068", "SE234", "MTIC1", "MPWC1", "421SE", "KSBA"]
 STATION_NAMES = {
     "KC6OYN": "La Cumbre",
     "SE068": "VOR",
@@ -21,7 +21,6 @@ STATION_NAMES = {
     "MTIC1": "Montecito",
     "MPWC1": "SM Pass",
     "421SE": "Parma",
-    "SE053": "Romero Cyn",
     "KSBA": "Airport",
 }
 
@@ -1292,13 +1291,17 @@ def draw_svg(
         temp_text = "temp missing"
         if row.get("temp_c") is not None:
             temp_text = "%.1f%s" % (row["temp_c"], temp_suffix)
+        elev_text = "elev-missing"
+        if row.get("elev_m") is not None:
+            elev_text = "%d%s" % (int(round(row["elev_m"])), altitude_unit)
+        station_with_elev = "%s %s" % (row["name"], elev_text)
 
         obs_time = row.get("wind_ob_time") or row.get("temp_ob_time")
         time_text = utc_iso_to_pst_hhmm(obs_time)
         if time_text:
-            prefix = "%s @ %s - %s, %s, DALR dev " % (row["name"], time_text, temp_text, wind_text_for_row(row))
+            prefix = "%s @ %s - %s, %s, DALR dev " % (station_with_elev, time_text, temp_text, wind_text_for_row(row))
         else:
-            prefix = "%s @ missing - %s, winds missing, DALR dev " % (row["name"], temp_text)
+            prefix = "%s @ missing - %s, winds missing, DALR dev " % (station_with_elev, temp_text)
 
         dalr_info = dalr_info_by_station.get(row["id"], {"kind": "missing", "items": []})
         kind = dalr_info.get("kind")
