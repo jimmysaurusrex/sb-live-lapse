@@ -708,6 +708,10 @@ def within_grace(iso_time: Optional[str], now_utc: datetime) -> bool:
 def apply_last_good_fallback(current_row: Dict, cached_row: Dict, now_utc: datetime) -> Dict:
     merged = dict(current_row)
     used_cache = False
+    had_current_wind = any(
+        current_row.get(key) is not None for key in ("wind_spd_mps", "wind_dir", "wind_ob_time", "wind_gust_mps")
+    )
+    used_cached_wind = False
 
     if merged.get("elev_m") is None and cached_row.get("elev_m") is not None:
         merged["elev_m"] = cached_row["elev_m"]
@@ -726,13 +730,21 @@ def apply_last_good_fallback(current_row: Dict, cached_row: Dict, now_utc: datet
         merged["wind_spd_mps"] = cached_row["wind_spd_mps"]
         merged["wind_ob_time"] = cached_row.get("wind_ob_time")
         used_cache = True
-    if merged.get("wind_gust_mps") is None and wind_cache_ok and cached_row.get("wind_gust_mps") is not None:
-        merged["wind_gust_mps"] = cached_row["wind_gust_mps"]
+        used_cached_wind = True
+    if merged.get("wind_dir") is None and wind_cache_ok and cached_row.get("wind_dir") is not None:
+        merged["wind_dir"] = cached_row["wind_dir"]
         if merged.get("wind_ob_time") is None:
             merged["wind_ob_time"] = cached_row.get("wind_ob_time")
         used_cache = True
-    if merged.get("wind_dir") is None and wind_cache_ok and cached_row.get("wind_dir") is not None:
-        merged["wind_dir"] = cached_row["wind_dir"]
+        used_cached_wind = True
+    # Only fall back gust when current data has no wind observation at all.
+    if (
+        merged.get("wind_gust_mps") is None
+        and wind_cache_ok
+        and cached_row.get("wind_gust_mps") is not None
+        and (used_cached_wind or not had_current_wind)
+    ):
+        merged["wind_gust_mps"] = cached_row["wind_gust_mps"]
         if merged.get("wind_ob_time") is None:
             merged["wind_ob_time"] = cached_row.get("wind_ob_time")
         used_cache = True
