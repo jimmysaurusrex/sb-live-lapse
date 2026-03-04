@@ -1027,7 +1027,7 @@ def build_lcl_title(vor_row_metric: Optional[Dict], altitude_unit: str) -> str:
     return f"Estimated LCL @ VOR: {cloud_base_value} {cloud_base_label} - {vor_wind}"
 
 
-def dalr_divergence_data(stations_all: List[Dict], dalr_rate_per_1000: float) -> Dict[str, Dict]:
+def station_lapse_rate_data(stations_all: List[Dict], temp_suffix: str, altitude_unit: str) -> Dict[str, Dict]:
     out: Dict[str, Dict] = {}
     usable = [row for row in stations_all if row.get("elev_m") is not None and row.get("temp_c") is not None]
 
@@ -1053,25 +1053,27 @@ def dalr_divergence_data(stations_all: List[Dict], dalr_rate_per_1000: float) ->
         lowers.sort(key=lambda item: item["elev_m"], reverse=True)
         parts: List[Dict] = []
         for lower in lowers:
-            predicted_temp = lower["temp_c"] - dalr_rate_per_1000 * (row["elev_m"] - lower["elev_m"]) / 1000.0
-            divergence = row["temp_c"] - predicted_temp
+            dz = row["elev_m"] - lower["elev_m"]
+            if dz <= 0:
+                continue
+            lapse_rate = (row["temp_c"] - lower["temp_c"]) / (dz / 1000.0)
             lower_name = lower.get("name") or lower.get("id") or "lower"
-            parts.append({"name": lower_name, "divergence": divergence})
+            parts.append({"name": lower_name, "lapse_rate": lapse_rate})
 
-        out[row_id] = {"kind": "values", "items": parts}
+        out[row_id] = {"kind": "values", "items": parts, "unit": f"{temp_suffix}/1000{altitude_unit}"}
 
     return out
 
 
-def next_lower_station_dalr_metrics(stations: List[Dict], dalr_rate_per_1000: float) -> Dict[str, Dict]:
-    out: Dict[str, Dict] = {}
+def next_lower_station_temp_diff(stations: List[Dict]) -> Dict[str, Optional[float]]:
+    out: Dict[str, Optional[float]] = {}
     usable = [row for row in stations if row.get("elev_m") is not None and row.get("temp_c") is not None]
 
     for row in stations:
         row_id = row.get("id")
         if not row_id or row.get("elev_m") is None or row.get("temp_c") is None:
             if row_id:
-                out[row_id] = {"deviation": None, "time_delta_min": None}
+                out[row_id] = None
             continue
 
         lower: Optional[Dict] = None
@@ -1084,35 +1086,40 @@ def next_lower_station_dalr_metrics(stations: List[Dict], dalr_rate_per_1000: fl
                 lower = candidate
 
         if lower is None:
-            out[row_id] = {"deviation": None, "time_delta_min": None}
+            out[row_id] = None
             continue
 
-        predicted_temp = lower["temp_c"] - dalr_rate_per_1000 * (row["elev_m"] - lower["elev_m"]) / 1000.0
-        upper_dt = parse_iso_utc(row.get("temp_ob_time"))
-        lower_dt = parse_iso_utc(lower.get("temp_ob_time"))
-        time_delta_min: Optional[int] = None
-        if upper_dt is not None and lower_dt is not None:
-            time_delta_min = int(round((lower_dt - upper_dt).total_seconds() / 60.0))
-        out[row_id] = {
-            "deviation": row["temp_c"] - predicted_temp,
-            "time_delta_min": time_delta_min,
-        }
+        out[row_id] = row["temp_c"] - lower["temp_c"]
 
     return out
 
 
-def rass_gate_dalr_deviations(
-    rass_points: List[Tuple[float, float]], dalr_rate_per_1000: float
-) -> List[Optional[float]]:
+def rass_gate_lapse_rates(rass_points: List[Tuple[float, float]]) -> List[Optional[float]]:
     if not rass_points:
         return []
     out: List[Optional[float]] = [None]
     for i in range(1, len(rass_points)):
         lower_alt, lower_temp = rass_points[i - 1]
         alt, temp = rass_points[i]
-        predicted = lower_temp - dalr_rate_per_1000 * (alt - lower_alt) / 1000.0
-        out.append(temp - predicted)
+        dz = alt - lower_alt
+        if dz <= 0:
+            out.append(None)
+        else:
+            out.append((temp - lower_temp) / (dz / 1000.0))
     return out
+
+
+def station_lapse_thresholds(temp_suffix: str, altitude_unit: str) -> Tuple[float, float]:
+    # Station-area lapse text coloring thresholds:
+    # red if lapse > -2.5 F/1000ft,
+    # blue if -3.5 < lapse <= -2.5 F/1000ft,
+    # bold blue if lapse <= -3.5 F/1000ft.
+    if temp_suffix == "F" and altitude_unit == "ft":
+        return -2.5, -3.5
+    if temp_suffix == "C" and altitude_unit == "m":
+        factor = (5.0 / 9.0) / 0.3048
+        return -2.5 * factor, -3.5 * factor
+    return -2.5, -3.5
 
 
 def draw_svg(
@@ -1207,6 +1214,7 @@ def draw_svg(
         "  .station-dev-na { font-family: Helvetica, Arial, sans-serif; font-size: 10px; fill: #666666; }",
         "  .rass-dev-pos { font-family: Helvetica, Arial, sans-serif; font-size: 9px; fill: #c62828; }",
         "  .rass-dev-neg { font-family: Helvetica, Arial, sans-serif; font-size: 9px; fill: #1565c0; }",
+        "  .rass-dev-neg-strong { font-family: Helvetica, Arial, sans-serif; font-size: 9px; fill: #1565c0; font-weight: 700; }",
         "  .rass-dev-na { font-family: Helvetica, Arial, sans-serif; font-size: 9px; fill: #666666; }",
         "</style>",
         '<rect x="0" y="0" width="%d" height="%d" fill="#ffffff" />' % (width, height),
@@ -1237,7 +1245,8 @@ def draw_svg(
     lines.append('<path class="rass" d="%s" />' % obs_path)
     lines.append('<path class="dalr" d="%s" />' % dalr_path)
 
-    rass_dev = rass_gate_dalr_deviations(rass_points, dalr_rate_per_1000)
+    station_red_threshold, station_bold_blue_threshold = station_lapse_thresholds(temp_suffix, altitude_unit)
+    rass_dev = rass_gate_lapse_rates(rass_points)
     for i, (alt, temp) in enumerate(rass_points):
         x_px = x_to_px(temp)
         y_px = y_to_px(alt)
@@ -1248,13 +1257,14 @@ def draw_svg(
             dev_text = "(n/a)"
             dev_class = "rass-dev-na"
         else:
-            dev_text = "(%+.1f)" % dev_val
-            if dev_val > 0:
+            dev_value = round(float(dev_val), 1)
+            dev_text = "(%+.1f)" % dev_value
+            if dev_value > station_red_threshold:
                 dev_class = "rass-dev-pos"
-            elif dev_val < 0:
-                dev_class = "rass-dev-neg"
+            elif dev_value <= station_bold_blue_threshold:
+                dev_class = "rass-dev-neg-strong"
             else:
-                dev_class = "rass-dev-na"
+                dev_class = "rass-dev-neg"
 
         dev_anchor = "start" if (i % 2 == 0) else "end"
         dev_x = x_px + 6 if dev_anchor == "start" else x_px - 6
@@ -1265,7 +1275,7 @@ def draw_svg(
             % (dev_class, dev_x, dev_y, dev_anchor, dev_text)
         )
 
-    station_dev = next_lower_station_dalr_metrics(stations_recent, dalr_rate_per_1000)
+    station_dev = next_lower_station_temp_diff(stations_recent)
     placed_ys: List[float] = []
     for row in stations_recent:
         x_px = x_to_px(row["temp_c"])
@@ -1293,13 +1303,10 @@ def draw_svg(
             dev_anchor = "start"
             dev_x = x_px + 6
 
-        dev_info = station_dev.get(row["id"], {"deviation": None, "time_delta_min": None})
-        dev_val = dev_info.get("deviation")
-        time_delta_min = dev_info.get("time_delta_min")
+        dev_val = station_dev.get(row["id"])
         if dev_val is None:
             dev_text = "(n/a)"
             dev_class = "station-dev-na"
-            time_text = ""
         else:
             dev_text = "(%+.1f)" % dev_val
             if dev_val > 0:
@@ -1308,19 +1315,12 @@ def draw_svg(
                 dev_class = "station-dev-neg"
             else:
                 dev_class = "station-dev-na"
-            time_text = " (%+dmin)" % time_delta_min if isinstance(time_delta_min, int) else " (n/a)"
 
         dev_y = min(height - margin_bottom - 2, label_y + 14)
-        if time_text:
-            lines.append(
-                '<text class="station-dev-na" x="%.2f" y="%.2f" text-anchor="%s"><tspan class="%s">%s</tspan><tspan fill="#444444">%s</tspan></text>'
-                % (dev_x, dev_y, dev_anchor, dev_class, dev_text, time_text)
-            )
-        else:
-            lines.append(
-                '<text class="%s" x="%.2f" y="%.2f" text-anchor="%s">%s</text>'
-                % (dev_class, dev_x, dev_y, dev_anchor, dev_text)
-            )
+        lines.append(
+            '<text class="%s" x="%.2f" y="%.2f" text-anchor="%s">%s</text>'
+            % (dev_class, dev_x, dev_y, dev_anchor, dev_text)
+        )
 
     legend_x = margin_left
     legend_y = height - margin_bottom + 52
@@ -1332,7 +1332,7 @@ def draw_svg(
 
     list_y0 = legend_y + 34
     lines.append('<text class="legend-h" x="%d" y="%d">Stations</text>' % (legend_x, list_y0))
-    dalr_info_by_station = dalr_divergence_data(stations_all, dalr_rate_per_1000)
+    lapse_info_by_station = station_lapse_rate_data(stations_all, temp_suffix, altitude_unit)
 
     row_y = list_y0 + 16
     for row in stations_all:
@@ -1347,13 +1347,13 @@ def draw_svg(
         obs_time = row.get("wind_ob_time") or row.get("temp_ob_time")
         time_text = utc_iso_to_pst_hhmm(obs_time)
         if time_text:
-            prefix = "%s @ %s - %s, %s, DALR dev " % (station_with_elev, time_text, temp_text, wind_text_for_row(row))
+            prefix = "%s @ %s - %s, %s, lapse " % (station_with_elev, time_text, temp_text, wind_text_for_row(row))
         else:
-            prefix = "%s @ missing - %s, winds missing, DALR dev " % (station_with_elev, temp_text)
+            prefix = "%s @ missing - %s, winds missing, lapse " % (station_with_elev, temp_text)
 
-        dalr_info = dalr_info_by_station.get(row["id"], {"kind": "missing", "items": []})
-        kind = dalr_info.get("kind")
-        items = dalr_info.get("items") if isinstance(dalr_info.get("items"), list) else []
+        lapse_info = lapse_info_by_station.get(row["id"], {"kind": "missing", "items": []})
+        kind = lapse_info.get("kind")
+        items = lapse_info.get("items") if isinstance(lapse_info.get("items"), list) else []
         if kind != "values" or not items:
             suffix = "n/a" if kind == "na" else "missing"
             lines.append('<text class="legend-row" x="%d" y="%d">%s%s</text>' % (legend_x, row_y, prefix, suffix))
@@ -1364,24 +1364,23 @@ def draw_svg(
                     continue
                 if i > 0:
                     pieces.append("<tspan>; </tspan>")
-                divergence = item.get("divergence")
-                if not isinstance(divergence, (int, float)):
+                lapse_rate = item.get("lapse_rate")
+                if not isinstance(lapse_rate, (int, float)):
                     token_text = "%s:missing" % (item.get("name") or "lower")
-                    token_color = "#333333"
+                    pieces.append('<tspan fill="#333333">%s</tspan>' % token_text)
                 else:
-                    token_text = "%s:%s%.1f%s" % (
-                        item.get("name") or "lower",
-                        "+" if divergence >= 0.0 else "",
-                        divergence,
-                        temp_suffix,
-                    )
-                    if divergence > 0:
-                        token_color = "#c62828"
-                    elif divergence < 0:
-                        token_color = "#1565c0"
+                    station_name = item.get("name") or "lower"
+                    lapse_value = round(float(lapse_rate), 1)
+                    lapse_text = "%+.1f" % lapse_value
+                    if lapse_value > station_red_threshold:
+                        pieces.append("<tspan>%s:</tspan>" % station_name)
+                        pieces.append('<tspan fill="#c62828">%s</tspan>' % lapse_text)
+                    elif lapse_value <= station_bold_blue_threshold:
+                        pieces.append("<tspan>%s:</tspan>" % station_name)
+                        pieces.append('<tspan fill="#1565c0" font-weight="700">%s</tspan>' % lapse_text)
                     else:
-                        token_color = "#333333"
-                pieces.append('<tspan fill="%s">%s</tspan>' % (token_color, token_text))
+                        pieces.append("<tspan>%s:</tspan>" % station_name)
+                        pieces.append('<tspan fill="#1565c0">%s</tspan>' % lapse_text)
             pieces.append("</text>")
             lines.append("".join(pieces))
         row_y += 14
