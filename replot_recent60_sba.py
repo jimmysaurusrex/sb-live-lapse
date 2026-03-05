@@ -54,6 +54,9 @@ RASS_LIST_RETRIES = 3
 RASS_FILE_RETRIES = 2
 RASS_CANDIDATE_COUNT = 5
 FETCH_RETRY_DELAY_SEC = 1.5
+DEPLOYED_FETCH_TIMEOUT_SEC = 18
+DEPLOYED_FETCH_RETRIES = 4
+DEPLOYED_FETCH_DELAY_SEC = 2.0
 
 
 def fetch_text(url: str, timeout: int = 25) -> str:
@@ -70,7 +73,7 @@ def fetch_text_with_retry(url: str, timeout: int, retries: int, delay_sec: float
         except Exception as exc:
             last_exc = exc
             if attempt < retries:
-                time.sleep(delay_sec)
+                time.sleep(delay_sec * attempt)
     if last_exc is None:
         raise RuntimeError("Fetch failed without exception: %s" % url)
     raise last_exc
@@ -184,6 +187,12 @@ def load_rass_with_fallback() -> Tuple[str, Optional[str], List[Tuple[int, float
             return RASS_TEXT_PATH.name, rass_time_utc, rass_points, "cached"
         except Exception as exc:
             errors.append(f"{RASS_TEXT_PATH.name}: {exc}")
+
+    try:
+        fallback_name, fallback_time, fallback_points, fallback_source = load_rass_from_history_fallback()
+        return fallback_name, fallback_time, fallback_points, fallback_source
+    except Exception as exc:
+        errors.append(f"history-fallback: {exc}")
 
     detail = " | ".join(errors[-4:]) if errors else "unknown"
     raise RuntimeError("Unable to load RASS data (%s)" % detail)
@@ -542,6 +551,10 @@ def history_continuity_required() -> bool:
     if override in ("0", "false", "no"):
         return False
 
+    # Scheduled runs should prefer availability over hard-failing continuity checks.
+    if os.getenv("GITHUB_EVENT_NAME", "").strip().lower() == "schedule":
+        return False
+
     return os.getenv("GITHUB_ACTIONS", "").strip().lower() == "true"
 
 
@@ -550,7 +563,14 @@ def load_last_good_state() -> Dict[str, Dict]:
     if not url:
         url = DEFAULT_DEPLOYED_STATE_URL
     try:
-        parsed = parse_state_payload(fetch_text(url, timeout=15))
+        parsed = parse_state_payload(
+            fetch_text_with_retry(
+                url,
+                timeout=DEPLOYED_FETCH_TIMEOUT_SEC,
+                retries=DEPLOYED_FETCH_RETRIES,
+                delay_sec=DEPLOYED_FETCH_DELAY_SEC,
+            )
+        )
         if parsed:
             return parsed
     except Exception:
@@ -568,7 +588,14 @@ def load_station_history() -> Tuple[List[Dict], str]:
     if not url:
         url = DEFAULT_DEPLOYED_HISTORY_URL
     try:
-        parsed, valid = parse_history_payload_with_presence(fetch_text(url, timeout=15))
+        parsed, valid = parse_history_payload_with_presence(
+            fetch_text_with_retry(
+                url,
+                timeout=DEPLOYED_FETCH_TIMEOUT_SEC,
+                retries=DEPLOYED_FETCH_RETRIES,
+                delay_sec=DEPLOYED_FETCH_DELAY_SEC,
+            )
+        )
         if valid:
             return parsed, "remote"
     except Exception:
@@ -662,6 +689,29 @@ def snapshot_to_rass_points(snapshot: Dict) -> List[Tuple[int, float]]:
         points.append((alt, temp))
     points.sort(key=lambda x: x[0])
     return points
+
+
+def load_rass_from_history_fallback() -> Tuple[str, Optional[str], List[Tuple[int, float]], str]:
+    history, source = load_station_history()
+    if not history:
+        raise RuntimeError("no station history snapshots available")
+
+    for snapshot in reversed(history):
+        points = snapshot_to_rass_points(snapshot)
+        if len(points) < 2:
+            continue
+
+        rass = snapshot.get("rass") if isinstance(snapshot.get("rass"), dict) else {}
+        fallback_name = str(rass.get("file") or "history_rass")
+
+        ob_time_raw = rass.get("ob_time_utc")
+        if not isinstance(ob_time_raw, str):
+            ob_time_raw = snapshot.get("run_at")
+        fallback_time = ob_time_raw if isinstance(ob_time_raw, str) else None
+
+        return fallback_name, fallback_time, points, f"{source}-history"
+
+    raise RuntimeError("no snapshots contain usable RASS data")
 
 
 def build_snapshot_svgs(snapshot: Dict) -> Optional[Tuple[str, str]]:
@@ -837,10 +887,16 @@ def write_station_history(
 
     run_at_iso = now_utc.strftime("%Y-%m-%dT%H:%M:%SZ")
     history, history_source = load_station_history()
-    if history_continuity_required() and history_source == "none":
+    continuity_required = history_continuity_required()
+    if continuity_required and history_source == "none":
         raise RuntimeError(
             "History continuity guard: existing station history unavailable from deployed URL and local fallback. "
             "Set SB_HISTORY_ALLOW_BOOTSTRAP=1 to allow bootstrap."
+        )
+    if not continuity_required and history_source == "none":
+        print(
+            "warning=history continuity unavailable; bootstrapping history for this run "
+            "(set SB_HISTORY_REQUIRE_CONTINUITY=1 to hard-fail instead)"
         )
 
     metric_rel, imperial_rel = write_snapshot_chart_files(run_at_iso, metric_svg, imperial_svg)
@@ -1432,6 +1488,8 @@ def main() -> None:
     stations_recent = [r for r in stations if r.get("recent") and r.get("temp_c") is not None and r.get("elev_m") is not None]
 
     rass_hhmm = utc_iso_to_pst_hhmm(rass_time_utc) or "missing"
+    if rass_source != "live":
+        rass_hhmm = f"{rass_hhmm} fallback"
     vor = next((r for r in stations if r["id"] == "SE068"), None)
     title_metric = build_lcl_title(vor, altitude_unit="m")
     title_imperial = build_lcl_title(vor, altitude_unit="ft")
