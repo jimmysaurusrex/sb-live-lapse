@@ -1121,7 +1121,7 @@ def station_lapse_rate_data(stations_all: List[Dict], temp_suffix: str, altitude
     return out
 
 
-def next_lower_station_temp_diff(stations: List[Dict]) -> Dict[str, Optional[float]]:
+def next_lower_station_lapse_rate(stations: List[Dict]) -> Dict[str, Optional[float]]:
     out: Dict[str, Optional[float]] = {}
     usable = [row for row in stations if row.get("elev_m") is not None and row.get("temp_c") is not None]
 
@@ -1145,7 +1145,11 @@ def next_lower_station_temp_diff(stations: List[Dict]) -> Dict[str, Optional[flo
             out[row_id] = None
             continue
 
-        out[row_id] = row["temp_c"] - lower["temp_c"]
+        dz = row["elev_m"] - lower["elev_m"]
+        if dz <= 0:
+            out[row_id] = None
+            continue
+        out[row_id] = (row["temp_c"] - lower["temp_c"]) / (dz / 1000.0)
 
     return out
 
@@ -1267,6 +1271,7 @@ def draw_svg(
         "  .station-label { font-family: Helvetica, Arial, sans-serif; font-size: 11px; fill: #444444; }",
         "  .station-dev-pos { font-family: Helvetica, Arial, sans-serif; font-size: 10px; fill: #c62828; }",
         "  .station-dev-neg { font-family: Helvetica, Arial, sans-serif; font-size: 10px; fill: #1565c0; }",
+        "  .station-dev-neg-strong { font-family: Helvetica, Arial, sans-serif; font-size: 10px; fill: #1565c0; font-weight: 700; }",
         "  .station-dev-na { font-family: Helvetica, Arial, sans-serif; font-size: 10px; fill: #666666; }",
         "  .rass-dev-pos { font-family: Helvetica, Arial, sans-serif; font-size: 9px; fill: #c62828; }",
         "  .rass-dev-neg { font-family: Helvetica, Arial, sans-serif; font-size: 9px; fill: #1565c0; }",
@@ -1334,7 +1339,7 @@ def draw_svg(
             % (dev_class, dev_x, dev_y, dev_anchor, dev_text)
         )
 
-    station_dev = next_lower_station_temp_diff(stations_recent)
+    station_dev = next_lower_station_lapse_rate(stations_recent)
     placed_ys: List[float] = []
     for row in stations_recent:
         x_px = x_to_px(row["temp_c"])
@@ -1351,14 +1356,21 @@ def draw_svg(
         label_y = max(margin_top + 10, min(height - margin_bottom - 16, label_y))
         placed_ys.append(label_y)
 
-        label = row["name"]
+        temp_text = "%.1f%s" % (row["temp_c"], temp_suffix)
+        label = "%s %s" % (row["name"], temp_text)
         est_w = 6 * len(label)
         if x_px + est_w + 8 > width - margin_right:
-            lines.append('<text class="station-label" x="%.2f" y="%.2f" text-anchor="end">%s</text>' % (x_px - 6, label_y + 4, label))
+            lines.append(
+                '<text class="station-label" x="%.2f" y="%.2f" text-anchor="end"><tspan>%s</tspan><tspan fill="#111111"> %s</tspan></text>'
+                % (x_px - 6, label_y + 4, row["name"], temp_text)
+            )
             dev_anchor = "end"
             dev_x = x_px - 6
         else:
-            lines.append('<text class="station-label" x="%.2f" y="%.2f" text-anchor="start">%s</text>' % (x_px + 6, label_y + 4, label))
+            lines.append(
+                '<text class="station-label" x="%.2f" y="%.2f" text-anchor="start"><tspan>%s</tspan><tspan fill="#111111"> %s</tspan></text>'
+                % (x_px + 6, label_y + 4, row["name"], temp_text)
+            )
             dev_anchor = "start"
             dev_x = x_px + 6
 
@@ -1367,13 +1379,14 @@ def draw_svg(
             dev_text = "(n/a)"
             dev_class = "station-dev-na"
         else:
-            dev_text = "(%+.1f)" % dev_val
-            if dev_val > 0:
+            dev_value = round(float(dev_val), 1)
+            dev_text = "(%+.1f)" % dev_value
+            if dev_value > station_red_threshold:
                 dev_class = "station-dev-pos"
-            elif dev_val < 0:
-                dev_class = "station-dev-neg"
+            elif dev_value <= station_bold_blue_threshold:
+                dev_class = "station-dev-neg-strong"
             else:
-                dev_class = "station-dev-na"
+                dev_class = "station-dev-neg"
 
         dev_y = min(height - margin_bottom - 2, label_y + 14)
         lines.append(
