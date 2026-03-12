@@ -20,6 +20,7 @@ concurrency:
 jobs:
   build:
     runs-on: ubuntu-latest
+    timeout-minutes: 8
     steps:
       - uses: actions/checkout@v5
 
@@ -27,8 +28,132 @@ jobs:
         with:
           python-version: "3.11"
 
-      - name: Build chart
-        run: python3 replot_recent60_sba.py
+      - name: Build chart (with retry)
+        run: |
+          set -Eeuo pipefail
+          : > build_stdout.log
+          : > build_stderr.log
+
+          attempts=2
+          base_delay=15
+          for attempt in $(seq 1 "$attempts"); do
+            echo "Build attempt ${attempt}/${attempts}" | tee -a build_stdout.log
+            if python3 replot_recent60_sba.py >> build_stdout.log 2>> build_stderr.log; then
+              echo "Build succeeded on attempt ${attempt}" | tee -a build_stdout.log
+              exit 0
+            fi
+            if [ "$attempt" -lt "$attempts" ]; then
+              sleep_seconds=$((base_delay * attempt))
+              echo "Attempt ${attempt} failed; retrying in ${sleep_seconds}s..." | tee -a build_stdout.log
+              sleep "$sleep_seconds"
+            fi
+          done
+
+          echo "All build attempts failed." | tee -a build_stdout.log
+          echo "--- stderr tail ---"
+          tail -n 150 build_stderr.log || true
+          exit 1
+
+      - name: Collect failure diagnostics
+        if: failure()
+        run: |
+          set +e
+          mkdir -p diagnostics
+          cp -f build_stdout.log diagnostics/ 2>/dev/null || true
+          cp -f build_stderr.log diagnostics/ 2>/dev/null || true
+
+          {
+            echo "generated_at_utc=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+            echo "event=${GITHUB_EVENT_NAME}"
+            echo "run_id=${GITHUB_RUN_ID}"
+            echo "run_attempt=${GITHUB_RUN_ATTEMPT}"
+            echo "sha=${GITHUB_SHA}"
+            echo "repository=${GITHUB_REPOSITORY}"
+          } > diagnostics/context.txt
+
+          REPO_NAME="${GITHUB_REPOSITORY#*/}"
+          STATE_URL="https://${GITHUB_REPOSITORY_OWNER}.github.io/${REPO_NAME}/station_state.json"
+          HISTORY_URL="https://${GITHUB_REPOSITORY_OWNER}.github.io/${REPO_NAME}/station_history.json"
+          MADIS_URL="https://madis-data.ncep.noaa.gov/madisPublic/cgi-bin/madisXmlPublicDir?time=0&minbck=-59&minfwd=0&recwin=3&timefilter=0&dfltrsel=3&stasel=1&stanam=SE068&pvdrsel=0&varsel=2&qctype=0&qcsel=1&xml=1&csvmiss=0"
+          CWOP_URL="http://www.findu.com/cgi-bin/wxxml.cgi?call=KC6OYN&last=2"
+
+          probe_get() {
+            name="$1"
+            url="$2"
+            body="diagnostics/${name}.body"
+            headers="diagnostics/${name}.headers"
+
+            {
+              echo "--- ${name} ---"
+              echo "url=${url}"
+              if curl -fsSL --max-time 20 -D "$headers" "$url" -o "$body"; then
+                echo "status=ok"
+                echo "body_bytes=$(wc -c < "$body")"
+                echo "headers_file=$(basename "$headers")"
+                echo "body_file=$(basename "$body")"
+                echo "body_head:"
+                head -c 400 "$body" || true
+                echo
+              else
+                echo "status=probe_failed"
+              fi
+              echo
+            } >> diagnostics/endpoints.txt
+          }
+
+          {
+            echo "=== Endpoint Probes ==="
+          } > diagnostics/endpoints.txt
+
+          probe_get "rass_root" "https://downloads.psl.noaa.gov/psd2/data/realtime/Radar449/WwTemp/sba/"
+          probe_get "madis_se068" "${MADIS_URL}"
+          probe_get "cwop_kc6oyn" "${CWOP_URL}"
+          probe_get "deployed_state" "${STATE_URL}"
+          probe_get "deployed_history" "${HISTORY_URL}"
+
+          python3 - <<'PY' > diagnostics/validation.txt
+          import json
+          from pathlib import Path
+
+          checks = []
+
+          madis_body = Path("diagnostics/madis_se068.body")
+          if madis_body.exists():
+              text = madis_body.read_text(errors="ignore")
+              checks.append(f"madis_has_record={'<record' in text}")
+
+          cwop_body = Path("diagnostics/cwop_kc6oyn.body")
+          if cwop_body.exists():
+              text = cwop_body.read_text(errors="ignore")
+              checks.append(f"cwop_has_weatherReport={'<weatherReport' in text}")
+
+          for name in ("deployed_state", "deployed_history"):
+              body = Path(f"diagnostics/{name}.body")
+              if not body.exists():
+                  continue
+              try:
+                  payload = json.loads(body.read_text())
+              except Exception as exc:
+                  checks.append(f"{name}_json_error={exc}")
+                  continue
+              if name == "deployed_state":
+                  stations = payload.get("stations") if isinstance(payload, dict) else None
+                  checks.append(f"deployed_state_has_stations={isinstance(stations, dict)}")
+              else:
+                  snapshots = payload.get("snapshots") if isinstance(payload, dict) else None
+                  checks.append(f"deployed_history_has_snapshots={isinstance(snapshots, list)}")
+
+          print("\n".join(checks))
+          PY
+
+      - name: Upload failure diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: refresh-diagnostics-${{ github.run_id }}-${{ github.run_attempt }}
+          path: diagnostics
+          if-no-files-found: warn
+          retention-days: 14
 
       - name: Prepare site artifact
         run: |
