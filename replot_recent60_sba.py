@@ -1272,6 +1272,7 @@ def draw_svg(
         "  .rass { fill: none; stroke: #000000; stroke-width: 2; }",
         "  .dalr { fill: none; stroke: #000000; stroke-width: 1.5; stroke-dasharray: 6 4; stroke-opacity: 0.45; }",
         "  .rass-point { fill: #0077b6; }",
+        "  .station-link { fill: none; stroke: #777777; stroke-width: 1.2; stroke-dasharray: 3 4; stroke-linecap: round; stroke-opacity: 0.95; }",
         "  .station { fill: #f4a261; stroke: #8b4c12; stroke-width: 1; }",
         "  .barb-shaft { stroke: #1f2937; stroke-width: 1.3; }",
         "  .barb-feather { stroke: #1f2937; stroke-width: 1.2; }",
@@ -1316,6 +1317,16 @@ def draw_svg(
 
     lines.append('<path class="rass" d="%s" />' % obs_path)
     lines.append('<path class="dalr" d="%s" />' % dalr_path)
+    station_line_rows = sorted(
+        [row for row in stations_recent if row.get("temp_c") is not None and row.get("elev_m") is not None],
+        key=lambda row: row["elev_m"],
+    )
+    if len(station_line_rows) >= 2:
+        station_path = " ".join(
+            (("M" if i == 0 else "L") + "%.2f,%.2f" % (x_to_px(row["temp_c"]), y_to_px(row["elev_m"])))
+            for i, row in enumerate(station_line_rows)
+        )
+        lines.append('<path class="station-link" d="%s" />' % station_path)
 
     station_red_threshold, station_bold_blue_threshold = station_lapse_thresholds(temp_suffix, altitude_unit)
     rass_dev = rass_gate_lapse_rates(rass_points)
