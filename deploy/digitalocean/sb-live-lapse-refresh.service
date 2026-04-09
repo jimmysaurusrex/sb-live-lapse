@@ -1,0 +1,16 @@
+[Unit]
+Description=Refresh SB live lapse chart assets
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=oneshot
+User=sb-live-lapse
+Group=sb-live-lapse
+EnvironmentFile=-/etc/sb-live-lapse.env
+WorkingDirectory=/opt/sb-live-lapse/repo
+ExecStart=/opt/sb-live-lapse/repo/deploy/digitalocean/run-refresh.sh
+Nice=10
+
+[Install]
+WantedBy=multi-user.target

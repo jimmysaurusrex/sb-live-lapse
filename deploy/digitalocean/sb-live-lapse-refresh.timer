@@ -1,0 +1,13 @@
+[Unit]
+Description=Run SB live lapse refresh every 5 minutes
+
+[Timer]
+OnBootSec=2min
+OnUnitActiveSec=5min
+AccuracySec=1s
+RandomizedDelaySec=0
+Persistent=true
+Unit=sb-live-lapse-refresh.service
+
+[Install]
+WantedBy=timers.target

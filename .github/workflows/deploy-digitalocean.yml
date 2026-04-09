@@ -1,0 +1,51 @@
+name: Deploy To DigitalOcean Droplet
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    if: ${{ github.event_name == 'workflow_dispatch' || vars.DO_DEPLOY_ENABLED == 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - name: Validate deploy secrets
+        env:
+          DO_HOST: ${{ secrets.DO_HOST }}
+          DO_USER: ${{ secrets.DO_USER }}
+          DO_SSH_PRIVATE_KEY: ${{ secrets.DO_SSH_PRIVATE_KEY }}
+        run: |
+          set -Eeuo pipefail
+          : "${DO_HOST:?Missing DO_HOST secret}"
+          : "${DO_USER:?Missing DO_USER secret}"
+          : "${DO_SSH_PRIVATE_KEY:?Missing DO_SSH_PRIVATE_KEY secret}"
+
+      - name: Configure SSH
+        env:
+          DO_HOST: ${{ secrets.DO_HOST }}
+          DO_PORT: ${{ secrets.DO_PORT }}
+          DO_SSH_PRIVATE_KEY: ${{ secrets.DO_SSH_PRIVATE_KEY }}
+        run: |
+          set -Eeuo pipefail
+          port="${DO_PORT:-22}"
+          mkdir -p "${HOME}/.ssh"
+          chmod 700 "${HOME}/.ssh"
+          printf '%s\n' "${DO_SSH_PRIVATE_KEY}" > "${HOME}/.ssh/id_ed25519"
+          chmod 600 "${HOME}/.ssh/id_ed25519"
+          ssh-keyscan -p "${port}" -H "${DO_HOST}" >> "${HOME}/.ssh/known_hosts"
+
+      - name: Deploy to droplet
+        env:
+          DO_HOST: ${{ secrets.DO_HOST }}
+          DO_PORT: ${{ secrets.DO_PORT }}
+          DO_USER: ${{ secrets.DO_USER }}
+        run: |
+          set -Eeuo pipefail
+          port="${DO_PORT:-22}"
+          ssh -p "${port}" "${DO_USER}@${DO_HOST}" \
+            'if command -v sudo >/dev/null 2>&1; then sudo /opt/sb-live-lapse/repo/deploy/digitalocean/deploy.sh; else /opt/sb-live-lapse/repo/deploy/digitalocean/deploy.sh; fi'
