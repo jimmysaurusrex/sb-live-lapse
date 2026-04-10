@@ -24,6 +24,9 @@ STATION_NAMES = {
     "421SE": "Parma",
     "KSBA": "Airport",
 }
+STATION_DISPLAY_IDS = {
+    "KC6OYN": "KC60YN",
+}
 
 RASS_BASE = "https://downloads.psl.noaa.gov/psd2/data/realtime/Radar449/WwTemp/sba/"
 MADIS_BASE = "https://madis-data.ncep.noaa.gov/madisPublic/cgi-bin/madisXmlPublicDir"
@@ -347,6 +350,10 @@ def blank_station_row(station_id: str) -> Dict:
         "wind_gust_mps": None,
         "wind_ob_time": None,
     }
+
+
+def station_display_id(station_id: str) -> str:
+    return STATION_DISPLAY_IDS.get(station_id, station_id)
 
 
 def fetch_station_cwop(station_id: str) -> Dict:
@@ -1436,7 +1443,7 @@ def draw_svg(
         elev_text = "elev-missing"
         if row.get("elev_m") is not None:
             elev_text = "%d%s" % (int(round(row["elev_m"])), altitude_unit)
-        station_with_elev = "%s %s" % (row["name"], elev_text)
+        station_with_elev = "%s (%s) %s" % (row["name"], station_display_id(row["id"]), elev_text)
 
         obs_time = row.get("wind_ob_time") or row.get("temp_ob_time")
         time_text = utc_iso_to_local_hhmm(obs_time)
