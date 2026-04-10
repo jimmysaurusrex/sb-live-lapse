@@ -4,6 +4,27 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>SB Live Lapse</title>
+  <link rel="canonical" href="https://sb-live-lapse.com/" />
+  <script>
+    (function () {
+      var githubPagesHost = "jimmysaurusrex.github.io";
+      var githubPagesPrefix = "/sb-live-lapse";
+      var canonicalOrigin = "https://sb-live-lapse.com";
+
+      if (window.location.hostname !== githubPagesHost) return;
+
+      var path = window.location.pathname;
+      if (path.indexOf(githubPagesPrefix) === 0) {
+        path = path.slice(githubPagesPrefix.length) || "/";
+      }
+      if (path === "/index.html") {
+        path = "/";
+      }
+
+      var target = canonicalOrigin + path + window.location.search + window.location.hash;
+      window.location.replace(target);
+    })();
+  </script>
 </head>
 <body style="font-family: Helvetica, Arial, sans-serif; margin: 20px;">
   <h1 id="chartTitle">Santa Barbara Lapse Chart (Refreshed --- --/-- at --:--)</h1>
