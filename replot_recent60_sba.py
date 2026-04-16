@@ -61,6 +61,7 @@ FETCH_RETRY_DELAY_SEC = 1.5
 DEPLOYED_FETCH_TIMEOUT_SEC = 18
 DEPLOYED_FETCH_RETRIES = 4
 DEPLOYED_FETCH_DELAY_SEC = 2.0
+RASS_LOWEST_GATE_IMPLAUSIBLE_DELTA_C = 6.0
 
 
 def fetch_text(url: str, timeout: int = 25) -> str:
@@ -105,6 +106,35 @@ def latest_rass_candidates(max_files: int = RASS_CANDIDATE_COUNT) -> Tuple[str, 
 
     files_desc = sorted(set(files), reverse=True)
     return str(year), f"{doy:03d}", files_desc[:max_files]
+
+
+def filter_implausible_lowest_rass_gate(
+    points: List[Tuple[int, float]], source_label: Optional[str] = None
+) -> List[Tuple[int, float]]:
+    if len(points) < 2:
+        return points
+
+    lowest_alt, lowest_temp = points[0]
+    next_alt, next_temp = points[1]
+    delta_c = abs(next_temp - lowest_temp)
+    if delta_c <= RASS_LOWEST_GATE_IMPLAUSIBLE_DELTA_C:
+        return points
+
+    label = source_label or "rass"
+    print(
+        "warning=dropping implausible lowest RASS gate source=%s lowest_alt_m=%d lowest_temp_c=%.3f "
+        "next_alt_m=%d next_temp_c=%.3f delta_c=%.3f threshold_c=%.1f"
+        % (
+            label,
+            lowest_alt,
+            lowest_temp,
+            next_alt,
+            next_temp,
+            delta_c,
+            RASS_LOWEST_GATE_IMPLAUSIBLE_DELTA_C,
+        )
+    )
+    return points[1:]
 
 
 def parse_rass(raw: str) -> Tuple[Optional[str], List[Tuple[int, float]]]:
@@ -164,6 +194,10 @@ def parse_rass(raw: str) -> Tuple[Optional[str], List[Tuple[int, float]]]:
         else:
             t = t0 + (t1 - t0) * (alt - a0) / (a1 - a0)
         out.append((alt, t))
+
+    out = filter_implausible_lowest_rass_gate(out, source_label="live-parse")
+    if len(out) < 2:
+        raise RuntimeError("Not enough valid RASS points after lowest-gate filter")
 
     return obs_time_utc, out
 
@@ -696,7 +730,12 @@ def snapshot_to_rass_points(snapshot: Dict) -> List[Tuple[int, float]]:
             continue
         points.append((alt, temp))
     points.sort(key=lambda x: x[0])
-    return points
+    source_label = None
+    if isinstance(rass, dict):
+        file_name = rass.get("file")
+        if isinstance(file_name, str) and file_name:
+            source_label = f"history:{file_name}"
+    return filter_implausible_lowest_rass_gate(points, source_label=source_label)
 
 
 def load_rass_from_history_fallback() -> Tuple[str, Optional[str], List[Tuple[int, float]], str]:
