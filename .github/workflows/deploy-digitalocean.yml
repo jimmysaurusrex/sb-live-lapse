@@ -35,8 +35,9 @@ jobs:
           port="${DO_PORT:-22}"
           mkdir -p "${HOME}/.ssh"
           chmod 700 "${HOME}/.ssh"
-          printf '%s\n' "${DO_SSH_PRIVATE_KEY}" > "${HOME}/.ssh/id_ed25519"
+          printf '%s\n' "${DO_SSH_PRIVATE_KEY}" | tr -d '\r' > "${HOME}/.ssh/id_ed25519"
           chmod 600 "${HOME}/.ssh/id_ed25519"
+          ssh-keygen -yf "${HOME}/.ssh/id_ed25519" >/dev/null
           ssh-keyscan -p "${port}" -H "${DO_HOST}" >> "${HOME}/.ssh/known_hosts"
 
       - name: Deploy to droplet
@@ -47,5 +48,5 @@ jobs:
         run: |
           set -Eeuo pipefail
           port="${DO_PORT:-22}"
-          ssh -p "${port}" "${DO_USER}@${DO_HOST}" \
+          ssh -i "${HOME}/.ssh/id_ed25519" -o BatchMode=yes -o IdentitiesOnly=yes -p "${port}" "${DO_USER}@${DO_HOST}" \
             'if command -v sudo >/dev/null 2>&1; then sudo /opt/sb-live-lapse/repo/deploy/digitalocean/deploy.sh; else /opt/sb-live-lapse/repo/deploy/digitalocean/deploy.sh; fi'
