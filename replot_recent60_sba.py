@@ -62,6 +62,7 @@ DEPLOYED_FETCH_TIMEOUT_SEC = 18
 DEPLOYED_FETCH_RETRIES = 4
 DEPLOYED_FETCH_DELAY_SEC = 2.0
 RASS_LOWEST_GATE_IMPLAUSIBLE_DELTA_C = 6.0
+RASS_MAX_AGE = timedelta(hours=6)
 
 
 def fetch_text(url: str, timeout: int = 25) -> str:
@@ -86,26 +87,26 @@ def fetch_text_with_retry(url: str, timeout: int, retries: int, delay_sec: float
 
 def latest_rass_candidates(max_files: int = RASS_CANDIDATE_COUNT) -> Tuple[str, str, List[str]]:
     root_html = fetch_text_with_retry(RASS_BASE, timeout=25, retries=RASS_LIST_RETRIES, delay_sec=FETCH_RETRY_DELAY_SEC)
-    years = [int(v) for v in re.findall(r'href="(20\d{2})/"', root_html)]
+    years = sorted({int(v) for v in re.findall(r'href="(20\d{2})/"', root_html)}, reverse=True)
     if not years:
         raise RuntimeError("No RASS year directories found")
 
-    year = max(years)
-    year_url = f"{RASS_BASE}{year}/"
-    year_html = fetch_text_with_retry(year_url, timeout=25, retries=RASS_LIST_RETRIES, delay_sec=FETCH_RETRY_DELAY_SEC)
-    doys = [int(v) for v in re.findall(r'href="(\d{3})/"', year_html)]
-    if not doys:
-        raise RuntimeError("No RASS day directories found")
+    for year in years:
+        year_url = f"{RASS_BASE}{year}/"
+        year_html = fetch_text_with_retry(year_url, timeout=25, retries=RASS_LIST_RETRIES, delay_sec=FETCH_RETRY_DELAY_SEC)
+        doys = sorted({int(v) for v in re.findall(r'href="(\d{3})/"', year_html)}, reverse=True)
+        if not doys:
+            continue
 
-    doy = max(doys)
-    day_url = f"{year_url}{doy:03d}/"
-    day_html = fetch_text_with_retry(day_url, timeout=25, retries=RASS_LIST_RETRIES, delay_sec=FETCH_RETRY_DELAY_SEC)
-    files = re.findall(r'href="(sba\d{5}\.\d{2}t)"', day_html)
-    if not files:
-        raise RuntimeError("No RASS files found in latest day")
+        for doy in doys:
+            day_url = f"{year_url}{doy:03d}/"
+            day_html = fetch_text_with_retry(day_url, timeout=25, retries=RASS_LIST_RETRIES, delay_sec=FETCH_RETRY_DELAY_SEC)
+            files = re.findall(r'href="(sba\d{5}\.\d{2}t)"', day_html)
+            if files:
+                files_desc = sorted(set(files), reverse=True)
+                return str(year), f"{doy:03d}", files_desc[:max_files]
 
-    files_desc = sorted(set(files), reverse=True)
-    return str(year), f"{doy:03d}", files_desc[:max_files]
+    raise RuntimeError("No RASS files found in available day directories")
 
 
 def filter_implausible_lowest_rass_gate(
@@ -359,6 +360,14 @@ def parse_iso_utc(iso_time: Optional[str]) -> Optional[datetime]:
     if dt.tzinfo is None:
         return dt.replace(tzinfo=timezone.utc)
     return dt.astimezone(timezone.utc)
+
+
+def rass_is_available(rass_time_utc: Optional[str], now_utc: datetime) -> bool:
+    obs_dt = parse_iso_utc(rass_time_utc)
+    if obs_dt is None:
+        return False
+    age = now_utc - obs_dt
+    return timedelta(0) <= age <= RASS_MAX_AGE
 
 
 def dewpoint_c_from_temp_rh(temp_c: float, rh_pct: float) -> Optional[float]:
@@ -782,7 +791,11 @@ def build_snapshot_svgs(snapshot: Dict) -> Optional[Tuple[str, str]]:
     title_imperial = build_lcl_title(vor, altitude_unit="ft")
 
     rass_obj = snapshot.get("rass") if isinstance(snapshot.get("rass"), dict) else {}
-    rass_hhmm = utc_iso_to_local_hhmm(rass_obj.get("ob_time_utc")) or "missing"
+    rass_time_utc = rass_obj.get("ob_time_utc") if isinstance(rass_obj.get("ob_time_utc"), str) else None
+    rass_available = rass_is_available(rass_time_utc, run_at)
+    rass_label = utc_iso_to_local_hhmm(rass_time_utc) or "missing"
+    if not rass_available:
+        rass_label = "UNAVAILABLE"
 
     metric_rass = convert_rass_points_units(rass_points, unit_system="metric")
     metric_all = convert_station_rows_units(stations, unit_system="metric")
@@ -797,7 +810,8 @@ def build_snapshot_svgs(snapshot: Dict) -> Optional[Tuple[str, str]]:
         metric_recent,
         metric_all,
         title_metric,
-        rass_hhmm,
+        rass_label,
+        rass_available,
         temp_unit="C",
         altitude_unit="m",
         temp_suffix="C",
@@ -810,7 +824,8 @@ def build_snapshot_svgs(snapshot: Dict) -> Optional[Tuple[str, str]]:
         imperial_recent,
         imperial_all,
         title_imperial,
-        rass_hhmm,
+        rass_label,
+        rass_available,
         temp_unit="F",
         altitude_unit="ft",
         temp_suffix="F",
@@ -1241,7 +1256,8 @@ def draw_svg(
     stations_recent: List[Dict],
     stations_all: List[Dict],
     title_text: str,
-    rass_time_hhmm_pst: str,
+    rass_label: str,
+    rass_available: bool,
     temp_unit: str,
     altitude_unit: str,
     temp_suffix: str,
@@ -1254,22 +1270,33 @@ def draw_svg(
     plot_w = width - margin_left - margin_right
     plot_h = height - margin_top - margin_bottom
 
-    anchor_alt, anchor_temp = rass_points[0]
+    plotted_rass = rass_points if rass_available else []
+    anchor_alt = anchor_temp = None
+    if plotted_rass:
+        anchor_alt, anchor_temp = plotted_rass[0]
 
     def dalr_temp(alt_value: float) -> float:
+        if anchor_alt is None or anchor_temp is None:
+            raise RuntimeError("DALR requested without an available RASS anchor")
         return anchor_temp - dalr_rate_per_1000 * (alt_value - anchor_alt) / 1000.0
 
     station_alts = [s["elev_m"] for s in stations_recent if s["elev_m"] is not None]
-    y_min = int(math.floor(min([0.0, rass_points[0][0]] + station_alts) / 100.0) * 100) if station_alts else 0
-    y_max = int(math.ceil(max([rass_points[-1][0]] + station_alts) / 100.0) * 100) if station_alts else rass_points[-1][0]
+    y_values = [0.0] + station_alts
+    if plotted_rass:
+        y_values.extend([plotted_rass[0][0], plotted_rass[-1][0]])
+    y_min = int(math.floor(min(y_values) / 100.0) * 100)
+    y_max = int(math.ceil(max(y_values) / 100.0) * 100)
     if y_max <= y_min:
         y_max = y_min + 100
 
-    dalr_bottom = dalr_temp(y_min)
-    dalr_top = dalr_temp(y_max)
-
-    x_vals = [t for _, t in rass_points] + [dalr_bottom, dalr_top]
-    x_vals += [s["temp_c"] for s in stations_recent if s["temp_c"] is not None]
+    x_vals = [s["temp_c"] for s in stations_recent if s["temp_c"] is not None]
+    dalr_bottom = dalr_top = None
+    if plotted_rass:
+        dalr_bottom = dalr_temp(y_min)
+        dalr_top = dalr_temp(y_max)
+        x_vals += [t for _, t in plotted_rass] + [dalr_bottom, dalr_top]
+    if not x_vals:
+        x_vals = [0.0, 1.0]
     x_min, x_max = min(x_vals) - 0.5, max(x_vals) + 0.5
     if x_max - x_min < 1.0:
         x_min -= 0.5
@@ -1281,16 +1308,19 @@ def draw_svg(
     def y_to_px(alt_m: float) -> float:
         return margin_top + (y_max - alt_m) / (y_max - y_min) * plot_h
 
-    obs_path = " ".join(
-        (("M" if i == 0 else "L") + "%.2f,%.2f" % (x_to_px(temp), y_to_px(alt)))
-        for i, (alt, temp) in enumerate(rass_points)
-    )
-    dalr_path = "M%.2f,%.2f L%.2f,%.2f" % (
-        x_to_px(dalr_bottom),
-        y_to_px(y_min),
-        x_to_px(dalr_top),
-        y_to_px(y_max),
-    )
+    obs_path = None
+    dalr_path = None
+    if plotted_rass and dalr_bottom is not None and dalr_top is not None:
+        obs_path = " ".join(
+            (("M" if i == 0 else "L") + "%.2f,%.2f" % (x_to_px(temp), y_to_px(alt)))
+            for i, (alt, temp) in enumerate(plotted_rass)
+        )
+        dalr_path = "M%.2f,%.2f L%.2f,%.2f" % (
+            x_to_px(dalr_bottom),
+            y_to_px(y_min),
+            x_to_px(dalr_top),
+            y_to_px(y_max),
+        )
 
     x_span = x_max - x_min
     x_step = 1 if x_span <= 5 else (2 if x_span <= 10 else 5)
@@ -1361,8 +1391,10 @@ def draw_svg(
         % (margin_top + plot_h / 2.0, margin_top + plot_h / 2.0, altitude_unit)
     )
 
-    lines.append('<path class="rass" d="%s" />' % obs_path)
-    lines.append('<path class="dalr" d="%s" />' % dalr_path)
+    if obs_path is not None:
+        lines.append('<path class="rass" d="%s" />' % obs_path)
+    if dalr_path is not None:
+        lines.append('<path class="dalr" d="%s" />' % dalr_path)
     station_line_rows = sorted(
         [row for row in stations_recent if row.get("temp_c") is not None and row.get("elev_m") is not None],
         key=lambda row: row["elev_m"],
@@ -1375,8 +1407,8 @@ def draw_svg(
         lines.append('<path class="station-link" d="%s" />' % station_path)
 
     station_red_threshold, station_bold_blue_threshold = station_lapse_thresholds(temp_suffix, altitude_unit)
-    rass_dev = rass_gate_lapse_rates(rass_points)
-    for i, (alt, temp) in enumerate(rass_points):
+    rass_dev = rass_gate_lapse_rates(plotted_rass)
+    for i, (alt, temp) in enumerate(plotted_rass):
         x_px = x_to_px(temp)
         y_px = y_to_px(alt)
         lines.append('<circle class="rass-point" cx="%.2f" cy="%.2f" r="2" />' % (x_px, y_px))
@@ -1463,10 +1495,14 @@ def draw_svg(
     legend_y = height - margin_bottom + 52
     dalr_x = legend_x + 220
     station_line_x = dalr_x + 260
-    lines.append('<line class="rass" x1="%d" y1="%d" x2="%d" y2="%d" />' % (legend_x, legend_y, legend_x + 24, legend_y))
-    lines.append('<text class="label" x="%d" y="%d">RASS @ %s</text>' % (legend_x + 30, legend_y + 4, rass_time_hhmm_pst))
-    lines.append('<line class="dalr" x1="%d" y1="%d" x2="%d" y2="%d" />' % (dalr_x, legend_y, dalr_x + 24, legend_y))
-    lines.append('<text class="label" x="%d" y="%d">%s</text>' % (dalr_x + 30, legend_y + 4, dalr_label))
+    if plotted_rass:
+        lines.append('<line class="rass" x1="%d" y1="%d" x2="%d" y2="%d" />' % (legend_x, legend_y, legend_x + 24, legend_y))
+        lines.append('<text class="label" x="%d" y="%d">RASS @ %s</text>' % (legend_x + 30, legend_y + 4, rass_label))
+        lines.append('<line class="dalr" x1="%d" y1="%d" x2="%d" y2="%d" />' % (dalr_x, legend_y, dalr_x + 24, legend_y))
+        lines.append('<text class="label" x="%d" y="%d">%s</text>' % (dalr_x + 30, legend_y + 4, dalr_label))
+    else:
+        lines.append('<text class="label" x="%d" y="%d">RASS @ %s</text>' % (legend_x, legend_y + 4, rass_label))
+        station_line_x = legend_x + 220
     lines.append('<line class="station-link" x1="%d" y1="%d" x2="%d" y2="%d" />' % (station_line_x, legend_y, station_line_x + 24, legend_y))
     lines.append('<text class="label" x="%d" y="%d">Station Lapse Line</text>' % (station_line_x + 30, legend_y + 4))
 
@@ -1534,6 +1570,7 @@ def main() -> None:
     now_utc = datetime.now(timezone.utc)
 
     filename, rass_time_utc, rass_points, rass_source = load_rass_with_fallback()
+    rass_available = rass_is_available(rass_time_utc, now_utc)
 
     stations: List[Dict] = []
     with ThreadPoolExecutor(max_workers=4) as pool:
@@ -1572,9 +1609,11 @@ def main() -> None:
 
     stations_recent = [r for r in stations if r.get("recent") and r.get("temp_c") is not None and r.get("elev_m") is not None]
 
-    rass_hhmm = utc_iso_to_local_hhmm(rass_time_utc) or "missing"
-    if rass_source != "live":
-        rass_hhmm = f"{rass_hhmm} fallback"
+    rass_label = utc_iso_to_local_hhmm(rass_time_utc) or "missing"
+    if rass_source != "live" and rass_label != "missing":
+        rass_label = f"{rass_label} fallback"
+    if not rass_available:
+        rass_label = "UNAVAILABLE"
     vor = next((r for r in stations if r["id"] == "SE068"), None)
     title_metric = build_lcl_title(vor, altitude_unit="m")
     title_imperial = build_lcl_title(vor, altitude_unit="ft")
@@ -1592,7 +1631,8 @@ def main() -> None:
         metric_recent,
         metric_all,
         title_metric,
-        rass_hhmm,
+        rass_label,
+        rass_available,
         temp_unit="C",
         altitude_unit="m",
         temp_suffix="C",
@@ -1605,7 +1645,8 @@ def main() -> None:
         imperial_recent,
         imperial_all,
         title_imperial,
-        rass_hhmm,
+        rass_label,
+        rass_available,
         temp_unit="F",
         altitude_unit="ft",
         temp_suffix="F",
@@ -1646,6 +1687,7 @@ def main() -> None:
     print("rass_file=%s" % filename)
     print("rass_source=%s" % rass_source)
     print("rass_time_utc=%s" % (rass_time_utc or "missing"))
+    print("rass_available=%s" % ("true" if rass_available else "false"))
     print("title_metric=%s" % title_metric)
     print("title_imperial=%s" % title_imperial)
     print("recent_station_count=%d" % len(stations_recent))
