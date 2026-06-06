@@ -11,6 +11,23 @@ EnvironmentFile=-/etc/sb-live-lapse.env
 WorkingDirectory=/opt/sb-live-lapse/repo
 ExecStart=/opt/sb-live-lapse/repo/deploy/digitalocean/run-refresh.sh
 Nice=10
+UMask=0022
+NoNewPrivileges=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectClock=true
+ProtectControlGroups=true
+ProtectKernelLogs=true
+ProtectKernelModules=true
+ProtectKernelTunables=true
+RestrictSUIDSGID=true
+LockPersonality=true
+SystemCallArchitectures=native
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+CapabilityBoundingSet=
+ReadWritePaths=/opt/sb-live-lapse /srv/sb-live-lapse
 
 [Install]
 WantedBy=multi-user.target

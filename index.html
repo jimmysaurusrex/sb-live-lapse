@@ -5,213 +5,29 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>SB Live Lapse</title>
   <link rel="canonical" href="https://sb-live-lapse.com/" />
-  <script>
-    (function () {
-      var githubPagesHost = "jimmysaurusrex.github.io";
-      var githubPagesPrefix = "/sb-live-lapse";
-      var canonicalOrigin = "https://sb-live-lapse.com";
-
-      if (window.location.hostname !== githubPagesHost) return;
-
-      var path = window.location.pathname;
-      if (path.indexOf(githubPagesPrefix) === 0) {
-        path = path.slice(githubPagesPrefix.length) || "/";
-      }
-      if (path === "/index.html") {
-        path = "/";
-      }
-
-      var target = canonicalOrigin + path + window.location.search + window.location.hash;
-      window.location.replace(target);
-    })();
-  </script>
+  <link rel="stylesheet" href="./styles.css" />
+  <script defer src="./app.js"></script>
 </head>
-<body style="font-family: Helvetica, Arial, sans-serif; margin: 20px;">
+<body>
   <h1 id="chartTitle">Santa Barbara Lapse Chart (Refreshed --- --/-- at --:--)</h1>
-  <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 12px;">
-    <button id="metricBtn" type="button" style="padding: 6px 10px; border: 1px solid #444; background: #111; color: #fff; border-radius: 4px; cursor: pointer;">Metric</button>
-    <button id="imperialBtn" type="button" style="padding: 6px 10px; border: 1px solid #888; background: #fff; color: #222; border-radius: 4px; cursor: pointer;">Imperial</button>
-    <button id="prevSnapshotBtn" type="button" style="padding: 6px 10px; border: 1px solid #888; background: #fff; color: #222; border-radius: 4px; cursor: pointer;">&#8592;</button>
-    <button id="nextSnapshotBtn" type="button" style="padding: 6px 10px; border: 1px solid #888; background: #fff; color: #222; border-radius: 4px; cursor: pointer;">&#8594;</button>
+  <div class="toolbar">
+    <button id="metricBtn" class="control-button is-active" type="button">Metric</button>
+    <button id="imperialBtn" class="control-button" type="button">Imperial</button>
+    <button id="prevSnapshotBtn" class="control-button" type="button">&#8592;</button>
+    <button id="nextSnapshotBtn" class="control-button" type="button">&#8594;</button>
     <a
       href="https://en.wikipedia.org/wiki/Radio_acoustic_sounding_system"
       target="_blank"
       rel="noopener noreferrer"
-      style="color: #0000EE; text-decoration: underline; font-size: 14px;"
+      class="toolbar-link"
     >What is RASS?</a>
     <a
       href="https://www.youtube.com/watch?v=dQw4w9WgXcQ&list=RDdQw4w9WgXcQ"
       target="_blank"
       rel="noopener noreferrer"
-      style="color: #0000EE; text-decoration: underline; font-size: 14px;"
+      class="toolbar-link"
     >Is today a good day to fly?</a>
   </div>
-  <img id="chart" src="./sba_wwtemp_chart_metric.svg" alt="Santa Barbara lapse chart" style="max-width: 100%; height: auto;" />
-  <script>
-    (function () {
-      var slotMs = 15 * 60 * 1000;
-      var slot = Math.floor(Date.now() / slotMs);
-      var img = document.getElementById("chart");
-      var title = document.getElementById("chartTitle");
-      var metricBtn = document.getElementById("metricBtn");
-      var imperialBtn = document.getElementById("imperialBtn");
-      var prevBtn = document.getElementById("prevSnapshotBtn");
-      var nextBtn = document.getElementById("nextSnapshotBtn");
-      var storageKey = "sb_units";
-      var latestSources = {
-        metric: "./sba_wwtemp_chart_metric.svg?v=" + slot,
-        imperial: "./sba_wwtemp_chart_imperial.svg?v=" + slot
-      };
-      var state = {
-        unit: "metric",
-        snapshots: [],
-        index: -1
-      };
-      var fetchedLatestTitle = false;
-
-      function formatPacificRefreshLabel(isoTime) {
-        if (!isoTime) return null;
-        var dt = new Date(isoTime);
-        if (isNaN(dt.getTime())) return null;
-        var parts = new Intl.DateTimeFormat("en-US", {
-          weekday: "short",
-          month: "numeric",
-          day: "numeric",
-          hour: "2-digit",
-          minute: "2-digit",
-          hour12: false,
-          timeZone: "America/Los_Angeles"
-        }).formatToParts(dt);
-        var values = {};
-        parts.forEach(function (part) {
-          if (part.type !== "literal") values[part.type] = part.value;
-        });
-        if (!values.weekday || !values.month || !values.day || !values.hour || !values.minute) {
-          return null;
-        }
-        return values.weekday + " " + values.month + "/" + values.day + " at " + values.hour + ":" + values.minute;
-      }
-
-      function setTitleForIso(isoTime) {
-        var label = formatPacificRefreshLabel(isoTime);
-        if (!label) return false;
-        title.textContent = "Santa Barbara Lapse Chart (Refreshed " + label + ")";
-        return true;
-      }
-
-      function updateUnitButtons() {
-        var isMetric = state.unit === "metric";
-        metricBtn.style.background = isMetric ? "#111" : "#fff";
-        metricBtn.style.color = isMetric ? "#fff" : "#222";
-        metricBtn.style.borderColor = isMetric ? "#444" : "#888";
-        imperialBtn.style.background = isMetric ? "#fff" : "#111";
-        imperialBtn.style.color = isMetric ? "#222" : "#fff";
-        imperialBtn.style.borderColor = isMetric ? "#888" : "#444";
-      }
-
-      function setNavButtonDisabled(btn, disabled) {
-        btn.disabled = disabled;
-        btn.style.opacity = disabled ? "0.45" : "1";
-        btn.style.cursor = disabled ? "default" : "pointer";
-      }
-
-      function updateNavButtons() {
-        var hasSnapshots = state.snapshots.length > 0;
-        setNavButtonDisabled(prevBtn, !hasSnapshots || state.index <= 0);
-        setNavButtonDisabled(nextBtn, !hasSnapshots || state.index >= state.snapshots.length - 1);
-      }
-
-      function currentSnapshot() {
-        if (state.index < 0 || state.index >= state.snapshots.length) return null;
-        return state.snapshots[state.index];
-      }
-
-      function sourceForSnapshot(snapshot, unit) {
-        if (snapshot && snapshot.charts) {
-          var key = unit === "imperial" ? "imperial_svg" : "metric_svg";
-          var value = snapshot.charts[key];
-          if (typeof value === "string" && value) {
-            var token = snapshot.run_at || String(slot);
-            var sep = value.indexOf("?") === -1 ? "?" : "&";
-            return value + sep + "v=" + encodeURIComponent(token);
-          }
-        }
-        return latestSources[unit];
-      }
-
-      function fetchLatestTitle() {
-        if (fetchedLatestTitle) return;
-        fetchedLatestTitle = true;
-        fetch("./station_state.json?v=" + slot, { cache: "no-store" })
-          .then(function (resp) { return resp.ok ? resp.json() : null; })
-          .then(function (latestState) {
-            if (!latestState || !latestState.generated_at) return;
-            setTitleForIso(latestState.generated_at);
-          })
-          .catch(function () {});
-      }
-
-      function render() {
-        updateUnitButtons();
-        updateNavButtons();
-        var snapshot = currentSnapshot();
-        img.src = sourceForSnapshot(snapshot, state.unit);
-        if (!snapshot || !setTitleForIso(snapshot.run_at)) {
-          fetchLatestTitle();
-        }
-      }
-
-      function setUnit(unit) {
-        state.unit = unit === "imperial" ? "imperial" : "metric";
-        try { localStorage.setItem(storageKey, state.unit); } catch (e) {}
-        render();
-      }
-
-      metricBtn.addEventListener("click", function () { setUnit("metric"); });
-      imperialBtn.addEventListener("click", function () { setUnit("imperial"); });
-      prevBtn.addEventListener("click", function () {
-        if (state.index > 0) {
-          state.index -= 1;
-          render();
-        }
-      });
-      nextBtn.addEventListener("click", function () {
-        if (state.index < state.snapshots.length - 1) {
-          state.index += 1;
-          render();
-        }
-      });
-
-      try {
-        var raw = localStorage.getItem(storageKey);
-        if (raw === "imperial") state.unit = "imperial";
-      } catch (e) {}
-      render();
-
-      fetch("./station_history.json?v=" + slot, { cache: "no-store" })
-        .then(function (resp) { return resp.ok ? resp.json() : null; })
-        .then(function (historyPayload) {
-          var snapshots = [];
-          if (historyPayload && Array.isArray(historyPayload.snapshots)) {
-            snapshots = historyPayload.snapshots.filter(function (snap) {
-              return !!(
-                snap &&
-                typeof snap.run_at === "string" &&
-                snap.charts &&
-                typeof snap.charts.metric_svg === "string" &&
-                typeof snap.charts.imperial_svg === "string"
-              );
-            });
-          }
-          snapshots.sort(function (a, b) {
-            return a.run_at < b.run_at ? -1 : (a.run_at > b.run_at ? 1 : 0);
-          });
-          state.snapshots = snapshots;
-          state.index = snapshots.length ? snapshots.length - 1 : -1;
-          render();
-        })
-        .catch(function () {});
-    })();
-  </script>
+  <img id="chart" src="./sba_wwtemp_chart_metric.svg" alt="Santa Barbara lapse chart" />
 </body>
 </html>

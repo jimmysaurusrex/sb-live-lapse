@@ -7,6 +7,7 @@ import time
 import urllib.parse
 import urllib.request
 import xml.etree.ElementTree as ET
+from html import escape as html_escape
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -30,7 +31,7 @@ STATION_DISPLAY_IDS = {
 
 RASS_BASE = "https://downloads.psl.noaa.gov/psd2/data/realtime/Radar449/WwTemp/sba/"
 MADIS_BASE = "https://madis-data.ncep.noaa.gov/madisPublic/cgi-bin/madisXmlPublicDir"
-CWOP_XML_BASE = "http://www.findu.com/cgi-bin/wxxml.cgi"
+CWOP_XML_BASE = "https://www.findu.com/cgi-bin/wxxml.cgi"
 
 # Repo-relative outputs so GitHub Actions can run this anywhere.
 CHART_PATH = Path("sba_wwtemp_chart.svg")
@@ -41,6 +42,7 @@ RASS_TEXT_PATH = Path("sba_latest.01t")
 STATE_PATH = Path("station_state.json")
 HISTORY_PATH = Path("station_history.json")
 SNAPSHOT_DIR = Path("snapshots")
+SNAPSHOT_CHART_RE = re.compile(r"^snapshots/\d{8}T\d{4}Z_(metric|imperial)\.svg$")
 
 MS_TO_MPH = 2.23694
 FT_PER_M = 3.28084
@@ -63,6 +65,14 @@ DEPLOYED_FETCH_RETRIES = 4
 DEPLOYED_FETCH_DELAY_SEC = 2.0
 RASS_LOWEST_GATE_IMPLAUSIBLE_DELTA_C = 6.0
 RASS_MAX_AGE = timedelta(hours=6)
+
+
+def svg_text(value: object) -> str:
+    return html_escape(str(value), quote=True)
+
+
+def is_snapshot_chart_path(path: object) -> bool:
+    return isinstance(path, str) and SNAPSHOT_CHART_RE.fullmatch(path) is not None
 
 
 def fetch_text(url: str, timeout: int = 25) -> str:
@@ -686,7 +696,7 @@ def history_chart_paths(snapshots: List[Dict]) -> List[str]:
             continue
         for key in ("metric_svg", "imperial_svg"):
             path = charts.get(key)
-            if isinstance(path, str) and path.startswith("snapshots/"):
+            if is_snapshot_chart_path(path):
                 paths.append(path)
     return paths
 
@@ -980,13 +990,15 @@ def write_station_history(
     )
     history = prune_history_snapshots(history, now_utc)
 
+    valid_history: List[Dict] = []
     for snapshot in history:
         charts = snapshot.get("charts") if isinstance(snapshot.get("charts"), dict) else {}
         metric_existing = charts.get("metric_svg") if isinstance(charts, dict) else None
         imperial_existing = charts.get("imperial_svg") if isinstance(charts, dict) else None
-        metric_ok = isinstance(metric_existing, str) and Path(metric_existing).exists()
-        imperial_ok = isinstance(imperial_existing, str) and Path(imperial_existing).exists()
+        metric_ok = is_snapshot_chart_path(metric_existing) and Path(metric_existing).exists()
+        imperial_ok = is_snapshot_chart_path(imperial_existing) and Path(imperial_existing).exists()
         if metric_ok and imperial_ok:
+            valid_history.append(snapshot)
             continue
         rebuilt = build_snapshot_svgs(snapshot)
         if rebuilt is None:
@@ -996,6 +1008,8 @@ def write_station_history(
             "metric_svg": metric_rel_built,
             "imperial_svg": imperial_rel_built,
         }
+        valid_history.append(snapshot)
+    history = valid_history
 
     payload = {
         "generated_at": now_utc.strftime("%Y-%m-%dT%H:%M:%SZ"),
@@ -1364,7 +1378,7 @@ def draw_svg(
         "  .rass-dev-na { font-family: Helvetica, Arial, sans-serif; font-size: 9px; fill: #666666; }",
         "</style>",
         '<rect x="0" y="0" width="%d" height="%d" fill="#ffffff" />' % (width, height),
-        '<text class="title" x="%d" y="%d">%s</text>' % (margin_left, margin_top - 22, title_text),
+        '<text class="title" x="%d" y="%d">%s</text>' % (margin_left, margin_top - 22, svg_text(title_text)),
     ]
 
     for y in y_ticks:
@@ -1384,11 +1398,11 @@ def draw_svg(
     lines.append('<line class="axis" x1="%d" y1="%d" x2="%d" y2="%d" />' % (margin_left, height - margin_bottom, width - margin_right, height - margin_bottom))
     lines.append(
         '<text class="label" x="%.2f" y="%d" text-anchor="middle">Temperature (%s)</text>'
-        % (margin_left + plot_w / 2.0, height - margin_bottom + 36, temp_unit)
+        % (margin_left + plot_w / 2.0, height - margin_bottom + 36, svg_text(temp_unit))
     )
     lines.append(
         '<text class="label" x="26" y="%.2f" text-anchor="middle" transform="rotate(-90 26 %.2f)">Altitude (%s)</text>'
-        % (margin_top + plot_h / 2.0, margin_top + plot_h / 2.0, altitude_unit)
+        % (margin_top + plot_h / 2.0, margin_top + plot_h / 2.0, svg_text(altitude_unit))
     )
 
     if obs_path is not None:
@@ -1433,7 +1447,7 @@ def draw_svg(
         dev_y = max(margin_top + 8, min(height - margin_bottom - 4, y_px - 3))
         lines.append(
             '<text class="%s" x="%.2f" y="%.2f" text-anchor="%s">%s</text>'
-            % (dev_class, dev_x, dev_y, dev_anchor, dev_text)
+            % (dev_class, dev_x, dev_y, dev_anchor, svg_text(dev_text))
         )
 
     station_dev = next_lower_station_lapse_rate(stations_recent)
@@ -1454,19 +1468,20 @@ def draw_svg(
         placed_ys.append(label_y)
 
         temp_text = "%.1f%s" % (row["temp_c"], temp_suffix)
-        label = "%s %s" % (row["name"], temp_text)
+        station_name_text = str(row["name"])
+        label = "%s %s" % (station_name_text, temp_text)
         est_w = 6 * len(label)
         if x_px + est_w + 8 > width - margin_right:
             lines.append(
                 '<text class="station-label" x="%.2f" y="%.2f" text-anchor="end"><tspan>%s</tspan><tspan fill="#111111"> %s</tspan></text>'
-                % (x_px - 6, label_y + 4, row["name"], temp_text)
+                % (x_px - 6, label_y + 4, svg_text(station_name_text), svg_text(temp_text))
             )
             dev_anchor = "end"
             dev_x = x_px - 6
         else:
             lines.append(
                 '<text class="station-label" x="%.2f" y="%.2f" text-anchor="start"><tspan>%s</tspan><tspan fill="#111111"> %s</tspan></text>'
-                % (x_px + 6, label_y + 4, row["name"], temp_text)
+                % (x_px + 6, label_y + 4, svg_text(station_name_text), svg_text(temp_text))
             )
             dev_anchor = "start"
             dev_x = x_px + 6
@@ -1488,7 +1503,7 @@ def draw_svg(
         dev_y = min(height - margin_bottom - 2, label_y + 14)
         lines.append(
             '<text class="%s" x="%.2f" y="%.2f" text-anchor="%s">%s</text>'
-            % (dev_class, dev_x, dev_y, dev_anchor, dev_text)
+            % (dev_class, dev_x, dev_y, dev_anchor, svg_text(dev_text))
         )
 
     legend_x = margin_left
@@ -1497,11 +1512,11 @@ def draw_svg(
     station_line_x = dalr_x + 260
     if plotted_rass:
         lines.append('<line class="rass" x1="%d" y1="%d" x2="%d" y2="%d" />' % (legend_x, legend_y, legend_x + 24, legend_y))
-        lines.append('<text class="label" x="%d" y="%d">RASS @ %s</text>' % (legend_x + 30, legend_y + 4, rass_label))
+        lines.append('<text class="label" x="%d" y="%d">RASS @ %s</text>' % (legend_x + 30, legend_y + 4, svg_text(rass_label)))
         lines.append('<line class="dalr" x1="%d" y1="%d" x2="%d" y2="%d" />' % (dalr_x, legend_y, dalr_x + 24, legend_y))
-        lines.append('<text class="label" x="%d" y="%d">%s</text>' % (dalr_x + 30, legend_y + 4, dalr_label))
+        lines.append('<text class="label" x="%d" y="%d">%s</text>' % (dalr_x + 30, legend_y + 4, svg_text(dalr_label)))
     else:
-        lines.append('<text class="label" x="%d" y="%d">RASS @ %s</text>' % (legend_x, legend_y + 4, rass_label))
+        lines.append('<text class="label" x="%d" y="%d">RASS @ %s</text>' % (legend_x, legend_y + 4, svg_text(rass_label)))
         station_line_x = legend_x + 220
     lines.append('<line class="station-link" x1="%d" y1="%d" x2="%d" y2="%d" />' % (station_line_x, legend_y, station_line_x + 24, legend_y))
     lines.append('<text class="label" x="%d" y="%d">Station Lapse Line</text>' % (station_line_x + 30, legend_y + 4))
@@ -1533,9 +1548,9 @@ def draw_svg(
         items = lapse_info.get("items") if isinstance(lapse_info.get("items"), list) else []
         if kind != "values" or not items:
             suffix = "n/a" if kind == "na" else "missing"
-            lines.append('<text class="legend-row" x="%d" y="%d">%s%s</text>' % (legend_x, row_y, prefix, suffix))
+            lines.append('<text class="legend-row" x="%d" y="%d">%s%s</text>' % (legend_x, row_y, svg_text(prefix), svg_text(suffix)))
         else:
-            pieces = ['<text class="legend-row" x="%d" y="%d">' % (legend_x, row_y), "<tspan>%s</tspan>" % prefix]
+            pieces = ['<text class="legend-row" x="%d" y="%d">' % (legend_x, row_y), "<tspan>%s</tspan>" % svg_text(prefix)]
             for i, item in enumerate(items):
                 if not isinstance(item, dict):
                     continue
@@ -1544,20 +1559,20 @@ def draw_svg(
                 lapse_rate = item.get("lapse_rate")
                 if not isinstance(lapse_rate, (int, float)):
                     token_text = "%s:missing" % (item.get("name") or "lower")
-                    pieces.append('<tspan fill="#333333">%s</tspan>' % token_text)
+                    pieces.append('<tspan fill="#333333">%s</tspan>' % svg_text(token_text))
                 else:
                     station_name = item.get("name") or "lower"
                     lapse_value = round(float(lapse_rate), 1)
                     lapse_text = "%+.1f" % lapse_value
                     if lapse_value > station_red_threshold:
-                        pieces.append("<tspan>%s:</tspan>" % station_name)
-                        pieces.append('<tspan fill="#c62828">%s</tspan>' % lapse_text)
+                        pieces.append("<tspan>%s:</tspan>" % svg_text(station_name))
+                        pieces.append('<tspan fill="#c62828">%s</tspan>' % svg_text(lapse_text))
                     elif lapse_value <= station_bold_blue_threshold:
-                        pieces.append("<tspan>%s:</tspan>" % station_name)
-                        pieces.append('<tspan fill="#1565c0" font-weight="700">%s</tspan>' % lapse_text)
+                        pieces.append("<tspan>%s:</tspan>" % svg_text(station_name))
+                        pieces.append('<tspan fill="#1565c0" font-weight="700">%s</tspan>' % svg_text(lapse_text))
                     else:
-                        pieces.append("<tspan>%s:</tspan>" % station_name)
-                        pieces.append('<tspan fill="#1565c0">%s</tspan>' % lapse_text)
+                        pieces.append("<tspan>%s:</tspan>" % svg_text(station_name))
+                        pieces.append('<tspan fill="#1565c0">%s</tspan>' % svg_text(lapse_text))
             pieces.append("</text>")
             lines.append("".join(pieces))
         row_y += 14

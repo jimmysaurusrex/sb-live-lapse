@@ -7,10 +7,19 @@ __SITE_ADDRESS__ {
 
 	@html path / /index.html
 	header @html Cache-Control "no-cache"
+	header @html Content-Security-Policy "default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; form-action 'none'; script-src 'self'; style-src 'self'; img-src 'self'; connect-src 'self'; upgrade-insecure-requests"
+
+	@page_assets path /app.js /styles.css
+	header @page_assets Cache-Control "no-cache"
 
 	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
 		X-Content-Type-Options "nosniff"
+		X-Frame-Options "DENY"
 		Referrer-Policy "strict-origin-when-cross-origin"
+		Permissions-Policy "accelerometer=(), camera=(), geolocation=(), gyroscope=(), magnetometer=(), microphone=(), payment=(), usb=()"
+		Cross-Origin-Opener-Policy "same-origin"
+		Cross-Origin-Resource-Policy "same-origin"
 	}
 
 	file_server

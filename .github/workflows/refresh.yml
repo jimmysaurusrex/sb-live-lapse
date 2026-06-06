@@ -155,6 +155,8 @@ jobs:
         run: |
           mkdir -p site
           cp index.html site/
+          cp app.js site/
+          cp styles.css site/
           cp sba_wwtemp_chart.svg site/
           cp sba_wwtemp_chart_metric.svg site/
           cp sba_wwtemp_chart_imperial.svg site/
