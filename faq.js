@@ -3,30 +3,45 @@
   var svg = document.getElementById('lesson-chart');
   if (!svg) return;
   var controls = document.querySelectorAll('[data-stage]');
-  var viewControls = document.querySelectorAll('[data-view]');
-  var stepsView = document.getElementById('steps-view');
-  var stackedView = document.getElementById('stacked-view');
-  var stackedCharts = stackedView.querySelectorAll('[data-layer]');
   var summary = document.getElementById('layer-summary');
+  var stationExample = document.getElementById('station-example');
+  var stationRowRates = document.getElementById('station-row-rates');
   var stage = 1;
-  var view = 'steps';
   var NS = 'http://www.w3.org/2000/svg';
-  // A deliberately simplified, fixed example, never current weather.
+  // Illustrative readings, never current weather. All seven real stations,
+  // ordered by elevation; the same readings and scales persist in every step.
   var stations = [
-    {name: 'Airport', z: 10, t: 82},
-    {name: 'AntFarm', z: 2355, t: 72},
-    {name: 'La Cumbre', z: 3940, t: 74}
+    {name:'Airport', z:10, t:82, dir:270, mph:10, labelY:444, mobileY:386},
+    {name:'Parma', z:780, t:78, dir:180, mph:5, labelY:413, mobileY:354},
+    {name:'SM Pass', z:1491, t:76, dir:190, mph:8, labelY:384, mobileY:326},
+    {name:'Montecito', z:1619, t:75.6, dir:120, mph:6, labelY:349, mobileY:298},
+    {name:'AntFarm', z:2355, t:72, dir:240, mph:7, labelY:306, mobileY:266},
+    {name:'VOR', z:3508, t:69, dir:235, mph:10, labelY:246, mobileY:228},
+    {name:'La Cumbre', z:3940, t:74, dir:230, mph:8, labelY:210, mobileY:192}
   ];
   var profile = [[1000,75],[1500,73],[2000,71],[2500,69],[3000,68],
     [3500,70],[4000,72],[4500,70],[5000,67],[5500,64],[6000,61],[6500,58]];
   var descriptions = [
     'Temperature increases to the right and altitude increases upward. A dashed dry-adiabatic line starts at 75 degrees Fahrenheit and 1,000 feet, cooling 5.4 degrees per 1,000 feet of climb.',
-    'Orange squares add three surface stations, joined in elevation order. La Cumbre is 2 degrees warmer than AntFarm, 1,585 feet below: plus 1.3 degrees Fahrenheit per thousand feet. These are different places, not one air column.',
-    'The black RASS profile adds measurements of the air over SBA. Between 3,000 and 4,000 feet it bends right, warming from 68 to 72 degrees: an inversion that may cap thermals. The last blue dot is the end of measurements, not the top of lift.'
+    'The entire station line joins seven orange squares in elevation order: Airport, Parma, SM Pass, Montecito, AntFarm, VOR and La Cumbre. Observed temperature appears beside the station name, and a wind barb at the square shows wind direction and speed. The station rows below the live chart also give temperature and wind in text. No station lapse rates are shown yet.',
+    'The entire black RASS line joins temperature readings taken directly above Santa Barbara Airport, SBA. Blue dots mark the measured levels. End of data does not mean thermal top. Surface stations stay separate: they sample air over different terrain. No lapse-rate numbers are shown yet.',
+    'Numbers in parentheses are lapse rates in degrees Fahrenheit per 1,000 feet, compared with the next lower point on the same line. Blue means likely soarable; red means likely not soarable. Negative is cooling upward, positive is warming upward. Bold blue is minus 3.5 or more negative; regular blue is above minus 3.5 through minus 2.5; red is above minus 2.5. The lowest point has no lower comparison, shown as n/a.'
   ];
-  var summaries = ['A dry parcel cools as it climbs.', 'Surface stations compare different places.', 'RASS reveals the structure of the air aloft.'];
-
-  function draw(svg, stage) {
+  var summaries = [
+    'A dry parcel cools as it climbs.',
+    'Seven surface stations, joined in elevation order.',
+    'Temperature readings directly above SBA.',
+    'Lapse rate: temperature change with height.'
+  ];
+  function lapse(t, z, lowerT, lowerZ) { return (t-lowerT)/((z-lowerZ)/1000); }
+  function rateText(rate) { return rate === null ? '(n/a)' : '('+(rate >= 0 ? '+' : '−')+Math.abs(rate).toFixed(1)+')'; }
+  function rateClass(rate) {
+    if (rate === null) return 'quiet';
+    // Match the live chart's classification of the displayed, rounded value.
+    var rounded = Number(rate.toFixed(1));
+    return rounded > -2.5 ? 'warm' : 'cool'+(rounded <= -3.5 ? ' strong' : '');
+  }
+  function draw() {
     function el(tag, attrs, content, parent) {
       var n = document.createElementNS(NS, tag);
       Object.keys(attrs || {}).forEach(function (key) { n.setAttribute(key, attrs[key]); });
@@ -42,6 +57,22 @@
       lines.forEach(function (s,i) { text(x,y+i*19,s,'label '+(i ? 'quiet' : (cls || 'emphasis'))); });
     }
     function leader(points) { el('polyline',{points:points.map(function(p){return p.join(',');}).join(' '),'class':'leader'}); }
+    function windBarb(s) {
+      var rad = s.dir*Math.PI/180, ux = Math.sin(rad), uy = -Math.cos(rad);
+      var nx = -uy, ny = ux;
+      var tipX = x(s.t)+18*ux, tipY = y(s.z)+18*uy;
+      var speed = 5*Math.round(s.mph/1.15078/5), offset = 0;
+      line(x(s.t),y(s.z),tipX,tipY,'wind-barb');
+      while (speed >= 10) {
+        var bx = tipX-offset*ux, by = tipY-offset*uy;
+        line(bx,by,bx+7*nx-2*ux,by+7*ny-2*uy,'wind-barb');
+        offset += 4; speed -= 10;
+      }
+      if (speed >= 5) {
+        var hx = tipX-offset*ux, hy = tipY-offset*uy;
+        line(hx,hy,hx+4*nx-1.2*ux,hy+4*ny-1.2*uy,'wind-barb');
+      }
+    }
     var width = Math.round(svg.parentElement.clientWidth);
     if (width < 1) return;
     var compact = width < 680;
@@ -59,13 +90,9 @@
     svg.setAttribute('data-current-stage',stage);
     el('title',{id:svg.id+'-title'},'Step '+stage+': '+summaries[stage-1]);
     el('desc',{id:svg.id+'-description'},descriptions[stage-1]);
-
-    // Identical physical scales and plot extents in all three layers.
     [0,2000,4000,6000].forEach(function(z) {
       line(left,y(z),right,y(z),'grid');
-      if (!(stage === 2 && z === 4000)) {
-        text(left-10,y(z)+4,z.toLocaleString('en-US'),'tick','end');
-      }
+      text(left-10,y(z)+4,z.toLocaleString('en-US'),'tick','end');
     });
     [50,60,70,80].forEach(function(t) {
       line(x(t),top,x(t),bottom,'grid');
@@ -77,24 +104,50 @@
     el('path',{d:'M'+x(dry(0))+','+y(0)+' L'+x(dry(6500))+','+y(6500),'class':'dalr'});
 
     if (stage >= 2) {
-      if (stage === 2) {
-        line(left,y(3940),x(74),y(3940),'projection');
-        line(x(74),y(3940),x(74),bottom,'projection');
-        text(left-10,y(3940)+4,'3,940','tick','end');
-        text(x(74),bottom+22,'74','tick','middle');
-      }
-      el('polyline',{points:stations.map(function(s){return x(s.t)+','+y(s.z);}).join(' '),'class':'station-line'+(stage===3?' prior':'')});
+      el('polyline',{points:stations.map(function(s){return x(s.t)+','+y(s.z);}).join(' '),'class':'station-line'});
     }
-    if (stage === 3) {
+    if (stage >= 3) {
       el('polyline',{points:profile.map(function(p){return x(p[1])+','+y(p[0]);}).join(' '),'class':'rass'});
       profile.forEach(function(p) { el('circle',{cx:x(p[1]),cy:y(p[0]),r:2.8,'class':'rass-dot'}); });
     }
+    var stationLabels = [];
     if (stage >= 2) {
-      stations.forEach(function(s) {
-        el('rect',{x:x(s.t)-3.5,y:y(s.z)-3.5,width:7,height:7,'class':'station'+(stage===3?' prior':'')});
+      text(x(dry(5200))-8,y(5200)+4,'DALR','label quiet','end');
+      stations.forEach(function(s, i) {
+        windBarb(s);
+        el('rect',{x:x(s.t)-3.5,y:y(s.z)-3.5,width:7,height:7,'class':'station'});
+        var labelX = compact ? left+4 : x(s.t)+10;
+        var labelY = compact ? s.mobileY : s.labelY;
+        var anchor = !compact && i===0 ? 'end' : 'start';
+        if (anchor === 'end') labelX = x(s.t)-9;
+        var label = el('text',{x:labelX,y:labelY,'class':'label station-name','text-anchor':anchor});
+        el('tspan',{},s.name+' ',label);
+        el('tspan',{'class':'observed-temp'},s.t.toFixed(1)+'F',label);
+        var labelWidth = label.getComputedTextLength();
+        if (!compact && anchor === 'start' && labelX+labelWidth > right+7) {
+          labelX = x(s.t)-9; anchor = 'end';
+          label.setAttribute('x',labelX); label.setAttribute('text-anchor',anchor);
+        }
+        if (compact) {
+          line(labelX+labelWidth+4,labelY-4,x(s.t)-6,y(s.z),'station-leader');
+        } else if (Math.abs(labelY-y(s.z)) > 14) {
+          line(labelX+(anchor==='end'?-4:4),labelY+4,x(s.t),y(s.z)+5,'station-leader');
+        }
+        stationLabels.push({x:labelX,y:labelY,anchor:anchor,width:labelWidth});
+        if (stage === 4) {
+          var rate = i ? lapse(s.t,s.z,stations[i-1].t,stations[i-1].z) : null;
+          text(labelX,labelY+13,rateText(rate),'label lapse-number station-rate '+rateClass(rate),anchor);
+        }
       });
     }
-
+    if (stage === 4) {
+      profile.forEach(function(p,i) {
+        var rate = i ? lapse(p[1],p[0],profile[i-1][1],profile[i-1][0]) : null;
+        // Keep the RASS numbers on the side away from the station labels.
+        var anchor = compact ? 'start' : 'end';
+        text(x(p[1])+(compact?8:-8),y(p[0])-4,rateText(rate),'label lapse-number rass-rate '+rateClass(rate),anchor);
+      });
+    }
     if (stage === 1) {
       // A dimensioned triangle translates the dry cooling rate into a slope.
       var za = 2000, zb = 3000;
@@ -122,94 +175,76 @@
     }
 
     if (stage === 2) {
-      text(x(dry(5200))+8,y(5200)+4,'DALR','label quiet');
+      var lc = stationLabels[6];
       if (compact) {
         note(left,18,['Orange squares: surface stations.']);
-        text(x(82)-8,y(10)-12,'Airport 82°F','label','end');
-        text(x(72)-9,y(2355)+21,'AntFarm 72°F','label','end');
-        text(x(74)-9,y(3940)-14,'La Cumbre 74°F','label','end');
-        text(x(74)-9,y(3940)+5,'(+1.3)','label warm','end');
-        leader([[x(77),y(1200)],[right,bottom-20],[right,481],[left+5,481]]);
-        note(left+5,501,['Joined in elevation order.','Different places, not one air column.']);
-        note(left+5,553,['(+1.3): 2°F warmer / 1,585 ft higher.'],'warm');
+        note(left+4,494,['74.0F = observed temperature.']);
+        note(left+4,525,['Barb = wind direction and speed.']);
+        note(left+4,556,['Short dashes join all seven stations.'],'quiet');
       } else {
-        text(x(82)-9,y(10)-12,'Airport 82°F','label','end');
-        text(x(72)-9,y(2355)+21,'AntFarm 72°F','label','end');
-        text(x(74)-9,y(3940)-16,'La Cumbre 74°F','label','end');
-        text(x(74)-9,y(3940)+4,'(+1.3)','label warm','end');
-        note(right+32,118,['An orange square is a station.','Its height is the station elevation;','its horizontal position is temperature.']);
-        line(x(74)+8,y(3940),right+18,151);
-        note(right+32,264,['(+1.3) °F / 1,000 ft','2°F warmer than AntFarm,','1,585 ft below.'],'warm');
-        leader([[x(74)+9,y(3940)+5],[right+6,255],[right+18,255]]);
-        note(right+32,378,['Short dashes connect stations.','Different places, ordered by height;','not one vertical sounding.']);
-        line(x(77),y(1200),right+18,385);
+        note(right+32,108,['Observed temperature','Beside each station name.']);
+        line(lc.x+(lc.anchor==='end'?0:lc.width)+4,lc.y-5,right+18,139);
+        note(right+32,242,['Wind at the station','Barb points into the wind;','feathers show speed in knots.']);
+        line(x(74)-11,y(3940)+12,right+18,250);
+        note(right+32,385,['Station Line','Short dashes join all seven stations,','in elevation order.']);
+        line(x(74),y(2000),right+18,391);
       }
     }
-
     if (stage === 3) {
-      text(x(dry(5200))-8,y(5200)+4,'DALR','label quiet','end');
-      // Mark an inversion, not a forecast ceiling or a predicted thermal top.
-      var ix = x(76);
-      line(ix,y(3000),ix,y(4000),'measure');
-      line(ix-4,y(3000),ix+4,y(3000),'measure');
-      line(ix-4,y(4000),ix+4,y(4000),'measure');
       if (compact) {
-        note(left,18,['Black line: the air above SBA.']);
+        note(left,18,['RASS: temperatures above SBA.']);
         text(x(58)+9,y(6500)+2,'RASS','label emphasis');
-        note(left+4,y(3800),['Warmer aloft','inversion'],'warm');
-        line(left+95,y(3800)+5,x(70)-5,y(3500));
-        text(x(76)+7,y(3500)+4,'+4°F','label warm');
-        text(x(82)-8,y(10)-12,'Airport','label quiet','end');
-        leader([[ix,y(3500)+15],[right,bottom-12],[right,480],[left+5,480]]);
-        note(left+5,500,['A warm layer can cap thermals.','Here: 68 → 72°F, 3,000 → 4,000 ft.'],'warm');
-        note(left+5,552,['Top dot = end of data, not top of lift.'],'quiet');
+        note(left+4,493,['Directly above SBA.']);
+        note(left+4,524,['End of data ≠ thermal top.']);
+        note(left+4,549,['Surface stations stay separate.','They sample air over different terrain.'],'quiet');
       } else {
-        text(x(74)+9,y(3940)+4,'La Cumbre','label quiet');
-        text(x(72)+9,y(2355)+4,'AntFarm','label quiet');
-        text(x(82)-9,y(10)-12,'Airport','label quiet','end');
-        note(right+32,87,['RASS: the air above SBA.','Black profile; blue plotted levels.','End of data ≠ thermal top.']);
-        line(x(58)+6,y(6500),right+18,94);
-        note(right+32,253,['An inversion: warmer aloft.','68 → 72°F between 3,000–4,000 ft.','A layer that can cap thermals.'],'warm');
-        line(ix+5,y(3500),right+18,257);
-        text(ix+8,y(3500)-8,'+4°F','label warm');
-        note(right+32,401,['Surface stations stay separate.','They sample air over different terrain.']);
-        line(x(72)+8,y(2355)+10,right+18,405);
+        note(right+32,82,['End of data ≠ thermal top.']);
+        line(x(58)+6,y(6500),right+18,86);
+        note(right+32,229,['RASS Line','Temperature readings directly above','Santa Barbara Airport (SBA).','Black line joins the measured levels.']);
+        line(x(68)+6,y(3000),right+18,236);
+        note(right+32,397,['Surface stations stay separate.','They sample air over different terrain.']);
+        line(x(72)+8,y(2355)+9,right+18,403);
+      }
+    }
+    if (stage === 4) {
+      if (compact) {
+        note(left,18,['Lapse rate · °F / 1,000 ft']);
+        note(left+4,489,['From the next lower point on that line.'],'quiet');
+        text(left+4,518,'Blue = likely soarable','label cool emphasis');
+        text(left+4,542,'Red = likely not soarable','label warm emphasis');
+        text(left+4,567,'− cooling upward · + warming upward','label quiet');
+      } else {
+        note(right+32,93,['Lapse rate · °F / 1,000 ft','Temperature change with height,','from the next lower point','on the same line.']);
+        line(x(61)-6,y(6000)-4,right+18,99);
+        text(right+32,241,'Blue = likely soarable','label cool emphasis');
+        text(right+32,273,'Red = likely not soarable','label warm emphasis');
+        note(right+32,367,['Negative: cooling upward.','Positive: warming upward.','n/a: no lower comparison.']);
       }
     }
   }
-  function drawVisibleCharts() {
-    if (view === 'stacked') {
-      stackedCharts.forEach(function(chart) { draw(chart, Number(chart.getAttribute('data-layer'))); });
-    } else {
-      draw(svg, stage);
-    }
+  function showStage(next) {
+    stage = next;
+    controls.forEach(function(b) { b.setAttribute('aria-pressed',String(Number(b.getAttribute('data-stage'))===stage)); });
+    summary.textContent = stage+' / 4 · '+summaries[stage-1];
+    stationExample.hidden = stage < 2;
+    stationRowRates.hidden = stage !== 4;
+    draw();
   }
-  function setView(nextView) {
-    view = nextView === 'stacked' ? 'stacked' : 'steps';
-    stepsView.hidden = view !== 'steps';
-    stackedView.hidden = view !== 'stacked';
-    viewControls.forEach(function(button) {
-      button.setAttribute('aria-pressed', String(button.getAttribute('data-view') === view));
-    });
-    drawVisibleCharts();
-  }
-  viewControls.forEach(function(button) {
-    button.addEventListener('click', function() {
-      var url = new URL(window.location.href);
-      url.searchParams.set('view', button.getAttribute('data-view'));
-      window.history.replaceState(null, '', url);
-      setView(button.getAttribute('data-view'));
-    });
-  });
   controls.forEach(function(button) {
-    button.addEventListener('click',function() {
-      stage = Number(button.getAttribute('data-stage'));
-      controls.forEach(function(b) { b.setAttribute('aria-pressed',String(b===button)); });
-      summary.textContent = stage+' / 3 · '+summaries[stage-1];
-      drawVisibleCharts();
-    });
+    button.addEventListener('click',function() { showStage(Number(button.getAttribute('data-stage'))); });
   });
-  // Both layouts use the same renderer, readings and physical scales.
-  new ResizeObserver(drawVisibleCharts).observe(document.querySelector('.visual-guide'));
-  setView(new URLSearchParams(window.location.search).get('view'));
+  var comparisons = document.getElementById('station-comparisons');
+  var laCumbre = stations[stations.length-1];
+  stations.slice(0,-1).reverse().forEach(function(lower) {
+    var rate = lapse(laCumbre.t,laCumbre.z,lower.t,lower.z);
+    var item = document.createElement('span');
+    var value = document.createElement('b');
+    item.textContent = lower.name+': ';
+    value.className = rateClass(rate);
+    value.textContent = rateText(rate).slice(1,-1);
+    item.appendChild(value);
+    comparisons.appendChild(item);
+  });
+  new ResizeObserver(draw).observe(svg.parentElement);
+  showStage(1);
 })();

@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <meta name="description" content="Read the Santa Barbara lapse chart in three visual steps: axes and DALR, surface stations, then the RASS sounding." />
+  <meta name="description" content="Read the Santa Barbara lapse chart in four visual steps: DALR, Station Line, RASS Line, and Lapse Rates." />
   <title>A visual guide for soaring pilots — SB Live Lapse</title>
   <link rel="canonical" href="https://sb-live-lapse.com/faq.html" />
   <link rel="stylesheet" href="./styles.css" />
@@ -18,60 +18,32 @@
       <p>A visual guide for Santa Barbara soaring pilots.</p>
     </header>
 
-    <div class="view-controls" role="group" aria-label="Guide layout">
-      <button type="button" data-view="steps" aria-pressed="true" aria-controls="steps-view stacked-view">Step through</button>
-      <button type="button" data-view="stacked" aria-pressed="false" aria-controls="steps-view stacked-view">All three</button>
+    <div class="layer-controls" role="group" aria-label="Chart layers">
+      <button type="button" data-stage="1" aria-pressed="true" aria-controls="lesson-chart station-example"><span>1</span> DALR</button>
+      <button type="button" data-stage="2" aria-pressed="false" aria-controls="lesson-chart station-example"><span>2</span> Station Line</button>
+      <button type="button" data-stage="3" aria-pressed="false" aria-controls="lesson-chart station-example"><span>3</span> RASS Line</button>
+      <button type="button" data-stage="4" aria-pressed="false" aria-controls="lesson-chart station-example"><span>4</span> Lapse Rates</button>
     </div>
+    <figure class="lesson-figure">
+      <svg id="lesson-chart" class="lesson-chart" role="img" aria-labelledby="lesson-chart-title lesson-chart-description"></svg>
+      <figcaption><span id="layer-summary" class="layer-summary" aria-live="polite">1 / 4 · A dry parcel cools as it climbs.</span><span>Illustrative readings · fixed scales</span></figcaption>
+    </figure>
 
-    <div id="steps-view">
-      <div class="layer-controls" role="group" aria-label="Chart layers">
-        <button type="button" data-stage="1" aria-pressed="true" aria-controls="lesson-chart"><span>1</span> Axes + DALR</button>
-        <button type="button" data-stage="2" aria-pressed="false" aria-controls="lesson-chart"><span>2</span> Add stations</button>
-        <button type="button" data-stage="3" aria-pressed="false" aria-controls="lesson-chart"><span>3</span> Add RASS</button>
+    <figure id="station-example" class="station-example" hidden>
+      <figcaption>In the station rows below the live chart</figcaption>
+      <div class="station-readout">
+        <span class="station-identity">La Cumbre (KC60YN) 3940ft @ 11:20 —</span>
+        <span class="readout-part"><b>74.0F</b><small>observed temperature</small></span>
+        <span class="readout-part"><b>winds 230, 8g14mph</b><small>from 230° · 8 mph, gusting 14</small></span>
       </div>
-      <figure class="lesson-figure">
-        <svg id="lesson-chart" class="lesson-chart" role="img" aria-labelledby="lesson-chart-title lesson-chart-description"></svg>
-        <figcaption><span id="layer-summary" class="layer-summary" aria-live="polite">1 / 3 · A dry parcel cools as it climbs.</span><span>Illustrative readings · fixed scales · three stations shown</span></figcaption>
-      </figure>
-    </div>
-
-    <div id="stacked-view" hidden>
-      <p class="example-note">Illustrative readings · the same scales in every diagram</p>
-      <section class="stacked-layer" aria-labelledby="axes-heading">
-        <h2 id="axes-heading"><span>1</span> Axes + DALR</h2>
-        <figure class="lesson-figure">
-          <svg id="axes-chart" class="lesson-chart" data-layer="1" role="img" aria-labelledby="axes-chart-title axes-chart-description"></svg>
-          <figcaption><span class="layer-summary">A dry parcel cools as it climbs.</span></figcaption>
-        </figure>
-      </section>
-      <section class="stacked-layer" aria-labelledby="stations-heading">
-        <h2 id="stations-heading"><span>2</span> Add stations</h2>
-        <figure class="lesson-figure">
-          <svg id="stations-chart" class="lesson-chart" data-layer="2" role="img" aria-labelledby="stations-chart-title stations-chart-description"></svg>
-          <figcaption><span class="layer-summary">Surface stations compare different places.</span><span>Three stations shown</span></figcaption>
-        </figure>
-      </section>
-      <section class="stacked-layer" aria-labelledby="rass-heading">
-        <h2 id="rass-heading"><span>3</span> Add RASS</h2>
-        <figure class="lesson-figure">
-          <svg id="rass-chart" class="lesson-chart" data-layer="3" role="img" aria-labelledby="rass-chart-title rass-chart-description"></svg>
-          <figcaption><span class="layer-summary">RASS reveals the structure of the air aloft.</span></figcaption>
-        </figure>
-      </section>
-    </div>
+      <div id="station-row-rates" class="station-row-rates" hidden>
+        <span>lapse/1000ft</span> <span id="station-comparisons"></span>
+        <small>Each number compares La Cumbre with the named lower station.</small>
+      </div>
+    </figure>
     <noscript><p>Enable JavaScript to view the annotated charts. The dashed DALR reference cools 5.4°F per 1,000 ft; orange squares are surface stations; the black RASS profile shows the air aloft. Up is higher and right is warmer.</p></noscript>
 
     <div class="field-notes">
-      <details>
-        <summary>The small numbers and their colors</summary>
-        <div class="rate-key" role="img" aria-label="Temperature change with height: bold blue at minus 3.5 Fahrenheit per thousand feet or more negative, blue above minus 3.5 through minus 2.5, red above minus 2.5. Positive means warming upward.">
-          <div class="rate-band strong"><b>−5.4</b><span>dry adiabatic</span><small>Bold blue ≤ −3.5</small></div>
-          <div class="rate-band blue"><b>−3.0</b><span>less cooling</span><small>−3.5 &lt; blue ≤ −2.5</small></div>
-          <div class="rate-band red"><b>+2.0</b><span>warmer upward</span><small>Red &gt; −2.5</small></div>
-        </div>
-        <p>°F / 1,000 ft here; °C / 1,000 m in Metric. Beside a point: the rate from the next lower plotted point. In a station row: the comparison with each named lower station. Blue describes cooling, not a launch decision.</p>
-      </details>
-
       <details>
         <summary>Wind and the VOR cloud-base estimate</summary>
         <div class="readout-key">
