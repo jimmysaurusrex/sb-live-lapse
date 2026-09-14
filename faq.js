@@ -3,8 +3,13 @@
   var svg = document.getElementById('lesson-chart');
   if (!svg) return;
   var controls = document.querySelectorAll('[data-stage]');
+  var viewControls = document.querySelectorAll('[data-view]');
+  var stepsView = document.getElementById('steps-view');
+  var stackedView = document.getElementById('stacked-view');
+  var stackedCharts = stackedView.querySelectorAll('[data-layer]');
   var summary = document.getElementById('layer-summary');
   var stage = 1;
+  var view = 'steps';
   var NS = 'http://www.w3.org/2000/svg';
   // A deliberately simplified, fixed example, never current weather.
   var stations = [
@@ -21,22 +26,22 @@
   ];
   var summaries = ['A dry parcel cools as it climbs.', 'Surface stations compare different places.', 'RASS reveals the structure of the air aloft.'];
 
-  function el(tag, attrs, content, parent) {
-    var n = document.createElementNS(NS, tag);
-    Object.keys(attrs || {}).forEach(function (key) { n.setAttribute(key, attrs[key]); });
-    if (content !== undefined) n.textContent = content;
-    (parent || svg).appendChild(n);
-    return n;
-  }
-  function line(x1,y1,x2,y2,cls) { return el('line',{x1:x1,y1:y1,x2:x2,y2:y2,'class':cls || 'leader'}); }
-  function text(x,y,words,cls,anchor) {
-    return el('text',{x:x,y:y,'class':cls || 'label','text-anchor':anchor || 'start'},words);
-  }
-  function note(x,y,lines,cls) {
-    lines.forEach(function (s,i) { text(x,y+i*19,s,'label '+(i ? 'quiet' : (cls || 'emphasis'))); });
-  }
-  function leader(points) { el('polyline',{points:points.map(function(p){return p.join(',');}).join(' '),'class':'leader'}); }
-  function draw() {
+  function draw(svg, stage) {
+    function el(tag, attrs, content, parent) {
+      var n = document.createElementNS(NS, tag);
+      Object.keys(attrs || {}).forEach(function (key) { n.setAttribute(key, attrs[key]); });
+      if (content !== undefined) n.textContent = content;
+      (parent || svg).appendChild(n);
+      return n;
+    }
+    function line(x1,y1,x2,y2,cls) { return el('line',{x1:x1,y1:y1,x2:x2,y2:y2,'class':cls || 'leader'}); }
+    function text(x,y,words,cls,anchor) {
+      return el('text',{x:x,y:y,'class':cls || 'label','text-anchor':anchor || 'start'},words);
+    }
+    function note(x,y,lines,cls) {
+      lines.forEach(function (s,i) { text(x,y+i*19,s,'label '+(i ? 'quiet' : (cls || 'emphasis'))); });
+    }
+    function leader(points) { el('polyline',{points:points.map(function(p){return p.join(',');}).join(' '),'class':'leader'}); }
     var width = Math.round(svg.parentElement.clientWidth);
     if (width < 1) return;
     var compact = width < 680;
@@ -52,8 +57,8 @@
     svg.setAttribute('viewBox','0 0 '+width+' '+height);
     svg.setAttribute('height',height);
     svg.setAttribute('data-current-stage',stage);
-    el('title',{id:'diagram-title'},'Step '+stage+': '+summaries[stage-1]);
-    el('desc',{id:'diagram-description'},descriptions[stage-1]);
+    el('title',{id:svg.id+'-title'},'Step '+stage+': '+summaries[stage-1]);
+    el('desc',{id:svg.id+'-description'},descriptions[stage-1]);
 
     // Identical physical scales and plot extents in all three layers.
     [0,2000,4000,6000].forEach(function(z) {
@@ -172,14 +177,39 @@
       }
     }
   }
+  function drawVisibleCharts() {
+    if (view === 'stacked') {
+      stackedCharts.forEach(function(chart) { draw(chart, Number(chart.getAttribute('data-layer'))); });
+    } else {
+      draw(svg, stage);
+    }
+  }
+  function setView(nextView) {
+    view = nextView === 'stacked' ? 'stacked' : 'steps';
+    stepsView.hidden = view !== 'steps';
+    stackedView.hidden = view !== 'stacked';
+    viewControls.forEach(function(button) {
+      button.setAttribute('aria-pressed', String(button.getAttribute('data-view') === view));
+    });
+    drawVisibleCharts();
+  }
+  viewControls.forEach(function(button) {
+    button.addEventListener('click', function() {
+      var url = new URL(window.location.href);
+      url.searchParams.set('view', button.getAttribute('data-view'));
+      window.history.replaceState(null, '', url);
+      setView(button.getAttribute('data-view'));
+    });
+  });
   controls.forEach(function(button) {
     button.addEventListener('click',function() {
       stage = Number(button.getAttribute('data-stage'));
       controls.forEach(function(b) { b.setAttribute('aria-pressed',String(b===button)); });
       summary.textContent = stage+' / 3 · '+summaries[stage-1];
-      draw();
+      drawVisibleCharts();
     });
   });
-  new ResizeObserver(draw).observe(svg.parentElement);
-  draw();
+  // Both layouts use the same renderer, readings and physical scales.
+  new ResizeObserver(drawVisibleCharts).observe(document.querySelector('.visual-guide'));
+  setView(new URLSearchParams(window.location.search).get('view'));
 })();

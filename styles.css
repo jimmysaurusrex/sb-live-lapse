@@ -51,34 +51,43 @@ body {
 .guide-header > a { font-size: 14px; }
 .guide-header h1 { font-size: clamp(23px, 3.5vw, 30px); font-weight: 500; letter-spacing: -.025em; line-height: 1.2; margin: 28px 0 8px; }
 .guide-header p { color: #626262; font-size: 15px; margin: 0 0 24px; }
+.view-controls { display: inline-flex; margin-bottom: 20px; padding: 3px; gap: 3px; border: 1px solid #d9d9d9; border-radius: 5px; }
+.view-controls button { border: 0; border-radius: 2px; padding: 6px 15px; color: #626262; background: none; font: inherit; font-size: 13px; cursor: pointer; }
+.view-controls button[aria-pressed="true"] { color: #fff; background: #363636; }
+.view-controls button:hover:not([aria-pressed="true"]) { background: #f2f2ef; color: #161616; }
+.example-note { color: #777; font-size: 12px; margin: 0 0 24px; }
+.stacked-layer h2 { font-size: 18px; font-weight: 500; margin: 0; }
+.stacked-layer h2 span { color: #777; margin-right: 9px; font-variant-numeric: tabular-nums; }
+.stacked-layer + .stacked-layer { margin-top: 36px; }
+.stacked-layer .lesson-figure { margin-top: 0; }
 .layer-controls { display: flex; gap: 28px; border-bottom: 1px solid #d9d9d9; }
 .layer-controls button { color: #777; padding: 10px 0 12px; margin-bottom: -1px; border: 0; border-bottom: 2px solid transparent; background: none; font: inherit; font-size: 15px; cursor: pointer; }
 .layer-controls button span { color: inherit; margin-right: 7px; font-variant-numeric: tabular-nums; }
 .layer-controls button[aria-pressed="true"] { color: #161616; border-bottom-color: #161616; }
 .layer-controls button:hover { color: #161616; }
 .lesson-figure { margin: 20px 0 28px; }
-#lesson-chart { display: block; width: 100%; overflow: visible; }
-#lesson-chart text { font-family: Helvetica, Arial, sans-serif; fill: #252525; font-size: 14px; }
-#lesson-chart .tick { fill: #777; font-size: 12px; font-variant-numeric: tabular-nums; }
-#lesson-chart .axis-label { font-size: 13px; fill: #505050; }
-#lesson-chart .grid { stroke: #eeeeec; stroke-width: 1; }
-#lesson-chart .axis { stroke: #aaa; stroke-width: 1; }
-#lesson-chart .dalr { stroke: #898989; stroke-width: 1.5; stroke-dasharray: 6 4; fill: none; }
-#lesson-chart .station-line { stroke: #888; stroke-width: 1.3; stroke-dasharray: 3 4; fill: none; }
-#lesson-chart .station { fill: #f4a261; stroke: #8b4c12; stroke-width: 1; }
-#lesson-chart .rass { stroke: #111; stroke-width: 2; fill: none; }
-#lesson-chart .rass-dot { fill: #0077b6; }
-#lesson-chart .leader { stroke: #8c8c86; stroke-width: 1; fill: none; }
-#lesson-chart .measure { stroke: #60605b; stroke-width: 1; fill: none; }
-#lesson-chart .projection { stroke: #cfa77f; stroke-width: 1; stroke-dasharray: 2 4; fill: none; }
-#lesson-chart .label { paint-order: stroke; stroke: #fff; stroke-width: 5px; stroke-linejoin: round; }
-#lesson-chart .emphasis { font-weight: 600; }
-#lesson-chart .quiet { fill: #626262; font-size: 13px; }
-#lesson-chart .warm { fill: #b52b28; }
-#lesson-chart .cool { fill: #1565c0; }
-#lesson-chart .prior { opacity: .58; }
+.lesson-chart { display: block; width: 100%; overflow: visible; }
+.lesson-chart text { font-family: Helvetica, Arial, sans-serif; fill: #252525; font-size: 14px; }
+.lesson-chart .tick { fill: #777; font-size: 12px; font-variant-numeric: tabular-nums; }
+.lesson-chart .axis-label { font-size: 13px; fill: #505050; }
+.lesson-chart .grid { stroke: #eeeeec; stroke-width: 1; }
+.lesson-chart .axis { stroke: #aaa; stroke-width: 1; }
+.lesson-chart .dalr { stroke: #898989; stroke-width: 1.5; stroke-dasharray: 6 4; fill: none; }
+.lesson-chart .station-line { stroke: #888; stroke-width: 1.3; stroke-dasharray: 3 4; fill: none; }
+.lesson-chart .station { fill: #f4a261; stroke: #8b4c12; stroke-width: 1; }
+.lesson-chart .rass { stroke: #111; stroke-width: 2; fill: none; }
+.lesson-chart .rass-dot { fill: #0077b6; }
+.lesson-chart .leader { stroke: #8c8c86; stroke-width: 1; fill: none; }
+.lesson-chart .measure { stroke: #60605b; stroke-width: 1; fill: none; }
+.lesson-chart .projection { stroke: #cfa77f; stroke-width: 1; stroke-dasharray: 2 4; fill: none; }
+.lesson-chart .label { paint-order: stroke; stroke: #fff; stroke-width: 5px; stroke-linejoin: round; }
+.lesson-chart .emphasis { font-weight: 600; }
+.lesson-chart .quiet { fill: #626262; font-size: 13px; }
+.lesson-chart .warm { fill: #b52b28; }
+.lesson-chart .cool { fill: #1565c0; }
+.lesson-chart .prior { opacity: .58; }
 .lesson-figure figcaption { display: flex; justify-content: space-between; gap: 10px; padding: 12px 0; border-top: 1px solid #ddd; font-size: 12px; color: #777; }
-#layer-summary { color: #363636; font-size: 13px; }
+.layer-summary { color: #363636; font-size: 13px; }
 .field-notes { border-top: 1px solid #bbb; }
 .field-notes details { border-bottom: 1px solid #ddd; padding: 0 0 2px; }
 .field-notes summary { padding: 15px 0; font-size: 14px; cursor: pointer; }
@@ -124,6 +133,7 @@ body {
   .time-key span { border: 0; margin: 0; padding: 0; }
 }
 @media print {
-  .layer-controls, .field-notes, .guide-footer { display: none; }
+  .view-controls, .layer-controls, .field-notes, .guide-footer { display: none; }
+  .stacked-layer { break-inside: avoid; }
   .visual-guide { max-width: none; padding: 0; }
 }

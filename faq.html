@@ -18,17 +18,48 @@
       <p>A visual guide for Santa Barbara soaring pilots.</p>
     </header>
 
-    <div class="layer-controls" role="group" aria-label="Chart layers">
-      <button type="button" data-stage="1" aria-pressed="true" aria-controls="lesson-chart"><span>1</span> Axes + DALR</button>
-      <button type="button" data-stage="2" aria-pressed="false" aria-controls="lesson-chart"><span>2</span> Add stations</button>
-      <button type="button" data-stage="3" aria-pressed="false" aria-controls="lesson-chart"><span>3</span> Add RASS</button>
+    <div class="view-controls" role="group" aria-label="Guide layout">
+      <button type="button" data-view="steps" aria-pressed="true" aria-controls="steps-view stacked-view">Step through</button>
+      <button type="button" data-view="stacked" aria-pressed="false" aria-controls="steps-view stacked-view">All three</button>
     </div>
 
-    <figure class="lesson-figure">
-      <svg id="lesson-chart" role="img" aria-labelledby="diagram-title diagram-description"></svg>
-      <figcaption><span id="layer-summary" aria-live="polite">1 / 3 · A dry parcel cools as it climbs.</span><span>Illustrative readings · fixed scales · three stations shown</span></figcaption>
-    </figure>
-    <noscript><p>Enable JavaScript to step through the annotated chart. The dashed DALR reference cools 5.4°F per 1,000 ft; orange squares are surface stations; the black RASS profile shows the air aloft. Up is higher and right is warmer.</p></noscript>
+    <div id="steps-view">
+      <div class="layer-controls" role="group" aria-label="Chart layers">
+        <button type="button" data-stage="1" aria-pressed="true" aria-controls="lesson-chart"><span>1</span> Axes + DALR</button>
+        <button type="button" data-stage="2" aria-pressed="false" aria-controls="lesson-chart"><span>2</span> Add stations</button>
+        <button type="button" data-stage="3" aria-pressed="false" aria-controls="lesson-chart"><span>3</span> Add RASS</button>
+      </div>
+      <figure class="lesson-figure">
+        <svg id="lesson-chart" class="lesson-chart" role="img" aria-labelledby="lesson-chart-title lesson-chart-description"></svg>
+        <figcaption><span id="layer-summary" class="layer-summary" aria-live="polite">1 / 3 · A dry parcel cools as it climbs.</span><span>Illustrative readings · fixed scales · three stations shown</span></figcaption>
+      </figure>
+    </div>
+
+    <div id="stacked-view" hidden>
+      <p class="example-note">Illustrative readings · the same scales in every diagram</p>
+      <section class="stacked-layer" aria-labelledby="axes-heading">
+        <h2 id="axes-heading"><span>1</span> Axes + DALR</h2>
+        <figure class="lesson-figure">
+          <svg id="axes-chart" class="lesson-chart" data-layer="1" role="img" aria-labelledby="axes-chart-title axes-chart-description"></svg>
+          <figcaption><span class="layer-summary">A dry parcel cools as it climbs.</span></figcaption>
+        </figure>
+      </section>
+      <section class="stacked-layer" aria-labelledby="stations-heading">
+        <h2 id="stations-heading"><span>2</span> Add stations</h2>
+        <figure class="lesson-figure">
+          <svg id="stations-chart" class="lesson-chart" data-layer="2" role="img" aria-labelledby="stations-chart-title stations-chart-description"></svg>
+          <figcaption><span class="layer-summary">Surface stations compare different places.</span><span>Three stations shown</span></figcaption>
+        </figure>
+      </section>
+      <section class="stacked-layer" aria-labelledby="rass-heading">
+        <h2 id="rass-heading"><span>3</span> Add RASS</h2>
+        <figure class="lesson-figure">
+          <svg id="rass-chart" class="lesson-chart" data-layer="3" role="img" aria-labelledby="rass-chart-title rass-chart-description"></svg>
+          <figcaption><span class="layer-summary">RASS reveals the structure of the air aloft.</span></figcaption>
+        </figure>
+      </section>
+    </div>
+    <noscript><p>Enable JavaScript to view the annotated charts. The dashed DALR reference cools 5.4°F per 1,000 ft; orange squares are surface stations; the black RASS profile shows the air aloft. Up is higher and right is warmer.</p></noscript>
 
     <div class="field-notes">
       <details>
