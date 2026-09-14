@@ -24,6 +24,9 @@ jobs:
         with:
           python-version: "3.11"
 
+      - name: Test station feed handling
+        run: python3 -m unittest discover -s tests -v
+
       - name: Build chart (with retry)
         run: |
           set -Eeuo pipefail
@@ -71,7 +74,8 @@ jobs:
           STATE_URL="https://${GITHUB_REPOSITORY_OWNER}.github.io/${REPO_NAME}/station_state.json"
           HISTORY_URL="https://${GITHUB_REPOSITORY_OWNER}.github.io/${REPO_NAME}/station_history.json"
           MADIS_URL="https://madis-data.ncep.noaa.gov/madisPublic/cgi-bin/madisXmlPublicDir?time=0&minbck=-59&minfwd=0&recwin=3&timefilter=0&dfltrsel=3&stasel=1&stanam=SE068&pvdrsel=0&varsel=2&qctype=0&qcsel=1&xml=1&csvmiss=0"
-          CWOP_URL="http://www.findu.com/cgi-bin/wxxml.cgi?call=KC6OYN&last=2"
+          CWOP_URL="https://www.findu.com/cgi-bin/wxxml.cgi?call=KC6OYN&last=2"
+          CWOP_FALLBACK_URL="http://www.findu.com/cgi-bin/wxxml.cgi?call=KC6OYN&last=2"
 
           probe_get() {
             name="$1"
@@ -104,6 +108,7 @@ jobs:
           probe_get "rass_root" "https://downloads.psl.noaa.gov/psd2/data/realtime/Radar449/WwTemp/sba/"
           probe_get "madis_se068" "${MADIS_URL}"
           probe_get "cwop_kc6oyn" "${CWOP_URL}"
+          probe_get "cwop_kc6oyn_fallback" "${CWOP_FALLBACK_URL}"
           probe_get "deployed_state" "${STATE_URL}"
           probe_get "deployed_history" "${HISTORY_URL}"
 

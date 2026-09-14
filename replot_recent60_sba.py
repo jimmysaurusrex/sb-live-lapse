@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 import json
+import logging
 import math
 import os
 import re
@@ -32,6 +33,10 @@ STATION_DISPLAY_IDS = {
 RASS_BASE = "https://downloads.psl.noaa.gov/psd2/data/realtime/Radar449/WwTemp/sba/"
 MADIS_BASE = "https://madis-data.ncep.noaa.gov/madisPublic/cgi-bin/madisXmlPublicDir"
 CWOP_XML_BASE = "https://www.findu.com/cgi-bin/wxxml.cgi"
+# findU's public weather endpoint works over HTTP even when its TLS certificate
+# is broken. This explicit, credential-free fallback is limited to findU; HTTPS
+# requests continue to use normal certificate and hostname verification.
+CWOP_XML_FALLBACK_BASE = "http://www.findu.com/cgi-bin/wxxml.cgi"
 
 # Repo-relative outputs so GitHub Actions can run this anywhere.
 CHART_PATH = Path("sba_wwtemp_chart.svg")
@@ -410,17 +415,32 @@ def station_display_id(station_id: str) -> str:
 
 
 def fetch_station_cwop(station_id: str) -> Dict:
+    query = urllib.parse.urlencode({"call": station_id, "last": "2"})
+    for base in (CWOP_XML_BASE, CWOP_XML_FALLBACK_BASE):
+        url = base + "?" + query
+        try:
+            out = parse_station_cwop(station_id, fetch_text(url, timeout=18))
+            if out.get("temp_c") is None:
+                raise ValueError("no usable temperature report")
+        except Exception as exc:
+            logging.warning("CWOP %s feed failed (%s): %s", station_id, base, exc)
+            continue
+        if base == CWOP_XML_FALLBACK_BASE:
+            logging.warning("CWOP %s using public HTTP fallback: %s", station_id, base)
+        return out
+
+    out = blank_station_row(station_id)
+    out["elev_m"] = CWOP_ELEV_M.get(station_id)
+    return out
+
+
+def parse_station_cwop(station_id: str, raw: str) -> Dict:
     out = blank_station_row(station_id)
     out["elev_m"] = CWOP_ELEV_M.get(station_id)
 
-    url = CWOP_XML_BASE + "?" + urllib.parse.urlencode({"call": station_id, "last": "2"})
-    try:
-        raw = fetch_text(url, timeout=18)
-        if "<station" not in raw:
-            return out
-        root = ET.fromstring(raw)
-    except Exception:
-        return out
+    root = ET.fromstring(raw)
+    if root.tag != "station" or (root.findtext("call") or "").strip().upper() != station_id.upper():
+        raise ValueError("response does not match requested station")
 
     latest_dt: Optional[datetime] = None
     latest_rep: Optional[ET.Element] = None
