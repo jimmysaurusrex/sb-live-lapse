@@ -161,6 +161,7 @@ jobs:
           mkdir -p site
           cp index.html site/
           cp faq.html site/
+          cp faq.js site/
           cp app.js site/
           cp styles.css site/
           cp sba_wwtemp_chart.svg site/
