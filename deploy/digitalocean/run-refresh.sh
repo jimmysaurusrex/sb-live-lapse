@@ -28,6 +28,7 @@ mkdir -p "${stage_dir}"
 
 files=(
   index.html
+  faq.html
   app.js
   styles.css
   sba_wwtemp_chart.svg

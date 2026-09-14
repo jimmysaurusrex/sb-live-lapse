@@ -5,6 +5,7 @@ body {
 
 .toolbar {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 8px;
   margin-bottom: 12px;
@@ -39,4 +40,81 @@ body {
 #chart {
   max-width: 100%;
   height: auto;
+}
+
+.faq-page {
+  margin: 0;
+  color: #202b32;
+  background: #f7f9fa;
+  line-height: 1.65;
+}
+
+.faq-page * { box-sizing: border-box; }
+.faq-page a { color: #155b83; text-underline-offset: 3px; }
+.faq-page a:hover { color: #0c3d5a; }
+.faq-page :focus-visible { outline: 3px solid #0077b6; outline-offset: 5px; }
+.faq-page h1, .faq-page h2, .faq-page h3 { line-height: 1.25; color: #142e3d; }
+.faq-page h1 { font-size: clamp(2rem, 6vw, 3rem); margin: 12px 0; letter-spacing: -0.035em; }
+.faq-page h2 { font-size: 1.4rem; margin: 0 0 16px; }
+.faq-page h3 { font-size: 1.05rem; margin: 0 0 4px; }
+.faq-page p { margin: 0 0 16px; }
+.faq-page li + li { margin-top: 8px; }
+.faq-page section { scroll-margin-top: 20px; }
+
+.faq-shell { max-width: 1020px; margin: 0 auto; padding: 28px 24px 56px; }
+.faq-header { max-width: 740px; padding: 32px 0 24px; }
+.faq-eyebrow { font-size: .78rem; font-weight: 700; letter-spacing: .13em; text-transform: uppercase; color: #526773; }
+.faq-intro { font-size: 1.15rem; color: #425866; }
+.faq-back { font-weight: 600; }
+.faq-card { background: #fff; border: 1px solid #dbe3e7; border-radius: 10px; padding: 26px; }
+.faq-quick { border-top: 4px solid #0077b6; margin-bottom: 28px; }
+.faq-quick ol { padding-left: 22px; margin-bottom: 0; }
+.faq-layout { display: grid; grid-template-columns: 190px minmax(0, 1fr); gap: 36px; align-items: start; }
+.faq-nav { position: sticky; top: 24px; font-size: .9rem; }
+.faq-nav strong { display: block; margin-bottom: 10px; }
+.faq-nav a { display: block; padding: 5px 0; }
+.faq-content { min-width: 0; }
+.faq-content section { padding: 0 0 26px; margin: 0 0 28px; border-bottom: 1px solid #dbe3e7; }
+.faq-key { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin: 24px 0; }
+.faq-key-item svg { display: block; width: 58px; height: 22px; margin-bottom: 8px; }
+.faq-key-item p { margin: 0; font-size: .94rem; }
+.faq-rass-line { stroke: #000; stroke-width: 2; fill: none; }
+.faq-rass-dot { fill: #0077b6; }
+.faq-dalr-line { stroke: #000; stroke-width: 1.5; stroke-dasharray: 6 4; opacity: .45; }
+.faq-station-line { stroke: #777; stroke-width: 1.2; stroke-dasharray: 3 4; }
+.faq-station-dot { fill: #f4a261; stroke: #8b4c12; }
+.faq-callout { border-left: 3px solid #0077b6; background: #edf4f8; padding: 14px 18px; margin: 20px 0; }
+.faq-callout p:last-child { margin-bottom: 0; }
+.faq-table-wrap { overflow-x: auto; margin: 20px 0; }
+.faq-page table { width: 100%; border-collapse: collapse; font-size: .91rem; text-align: left; }
+.faq-page caption { text-align: left; font-weight: 600; margin-bottom: 8px; }
+.faq-page th, .faq-page td { padding: 10px 12px; border-bottom: 1px solid #dbe3e7; vertical-align: top; }
+.faq-page th { background: #eaf0f3; color: #233e4d; }
+.faq-red { color: #c62828; }
+.faq-blue { color: #1565c0; }
+.faq-example { display: block; padding: 16px; background: #eaf0f3; border-radius: 6px; font-size: .87rem; overflow-wrap: anywhere; }
+.faq-small { font-size: .88rem; color: #526773; }
+.faq-footer { padding-top: 4px; }
+
+@media (max-width: 720px) {
+  .faq-shell { padding: 20px 18px 40px; }
+  .faq-header { padding-top: 26px; }
+  .faq-card { padding: 20px; }
+  .faq-layout { grid-template-columns: 1fr; gap: 28px; }
+  .faq-nav { position: static; padding-bottom: 20px; border-bottom: 1px solid #dbe3e7; }
+  .faq-nav a { display: inline-block; margin-right: 16px; padding: 7px 0; }
+}
+
+@media (max-width: 420px) {
+  .faq-key { grid-template-columns: 1fr; }
+  .faq-page th, .faq-page td { padding: 8px; }
+}
+
+@media print {
+  .faq-page { background: #fff; color: #000; }
+  .faq-shell { max-width: none; padding: 0; }
+  .faq-layout { display: block; }
+  .faq-nav, .faq-back { display: none; }
+  .faq-page h2, .faq-page h3 { break-after: avoid; }
+  .faq-key-item, .faq-callout, .faq-page tr { break-inside: avoid; }
 }

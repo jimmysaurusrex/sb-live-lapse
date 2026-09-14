@@ -1,0 +1,191 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="description" content="How soaring pilots can read the Santa Barbara lapse chart: RASS, inversions, lapse rates, wind barbs, cloud base, and observation times." />
+  <title>Help / FAQ for Soaring Pilots — SB Live Lapse</title>
+  <link rel="canonical" href="https://sb-live-lapse.com/faq.html" />
+  <link rel="stylesheet" href="./styles.css" />
+  <script defer src="./app.js"></script>
+</head>
+<body class="faq-page">
+  <main class="faq-shell">
+    <a class="faq-back" href="./">← Back to the lapse chart</a>
+    <header class="faq-header">
+      <div class="faq-eyebrow">SB Live Lapse · Pilot reference</div>
+      <h1>How to read the lapse chart</h1>
+      <p class="faq-intro">Help and FAQ for Santa Barbara soaring pilots. Use the chart to look for stable layers, compare temperatures along the front range, and follow how the day is changing.</p>
+    </header>
+
+    <section class="faq-card faq-quick" aria-labelledby="quick-title">
+      <h2 id="quick-title">What should I look at first?</h2>
+      <ol>
+        <li><strong>Check the times.</strong> The page refresh, RASS sounding, and station observations can all have different ages.</li>
+        <li><strong>Look for a lid.</strong> Follow the black profile upward. A bend to the right means warmer air above cooler air: an inversion.</li>
+        <li><strong>Compare cooling with height.</strong> Use the lapse numbers and dashed dry-adiabatic reference to judge how quickly a rising thermal would lose its temperature advantage.</li>
+        <li><strong>Add the local picture.</strong> Compare station winds, the VOR LCL estimate, and earlier snapshots with what you see at launch and hear from pilots already flying.</li>
+      </ol>
+    </section>
+
+    <div class="faq-layout">
+      <nav class="faq-nav" aria-label="FAQ topics">
+        <strong>On this page</strong>
+        <a href="#chart-key">Axes &amp; chart key</a>
+        <a href="#rass">What RASS measures</a>
+        <a href="#dalr">The DALR line</a>
+        <a href="#lapse">Numbers &amp; colors</a>
+        <a href="#soaring">Reading the soaring day</a>
+        <a href="#lcl">LCL / cloud base</a>
+        <a href="#wind">Winds &amp; barbs</a>
+        <a href="#stations">Station names &amp; rows</a>
+        <a href="#time">Times &amp; missing data</a>
+        <a href="#controls">Units &amp; history</a>
+      </nav>
+
+      <div class="faq-content">
+        <section id="chart-key" aria-labelledby="key-title">
+          <h2 id="key-title">What do the axes, dots, and lines mean?</h2>
+          <p><strong>Up is higher; right is warmer.</strong> This is a temperature-versus-altitude plot with straight axes. Metric shows °C and meters; Imperial shows °F and feet. Station elevations and the LCL are above mean sea level (MSL), not height above launch. The chart does not draw the terrain beneath you.</p>
+          <div class="faq-key">
+            <div class="faq-key-item">
+              <svg viewBox="0 0 58 22" aria-hidden="true"><path class="faq-rass-line" d="M2 17 L20 11 L38 14 L56 4"/><circle class="faq-rass-dot" cx="20" cy="11" r="3"/><circle class="faq-rass-dot" cx="38" cy="14" r="3"/></svg>
+              <h3>Black line + blue dots</h3>
+              <p>The RASS temperature profile over the SBA profiler. The dots are plotted profile levels.</p>
+            </div>
+            <div class="faq-key-item">
+              <svg viewBox="0 0 58 22" aria-hidden="true"><line class="faq-dalr-line" x1="2" y1="11" x2="56" y2="11"/></svg>
+              <h3>Long gray dashes</h3>
+              <p>The DALR reference: cooling of an unsaturated rising parcel. It is anchored to the lowest plotted RASS point.</p>
+            </div>
+            <div class="faq-key-item">
+              <svg viewBox="0 0 58 22" aria-hidden="true"><rect class="faq-station-dot" x="24" y="7" width="8" height="8"/></svg>
+              <h3>Orange squares</h3>
+              <p>Surface weather stations, placed at their elevations and reported temperatures. Read the square's position; labels may be shifted to avoid overlap.</p>
+            </div>
+            <div class="faq-key-item">
+              <svg viewBox="0 0 58 22" aria-hidden="true"><line class="faq-station-line" x1="2" y1="17" x2="56" y2="5"/><rect class="faq-station-dot" x="9" y="11" width="6" height="6"/><rect class="faq-station-dot" x="43" y="4" width="6" height="6"/></svg>
+              <h3>Short gray dashes</h3>
+              <p>The Station Lapse Line joins available stations in elevation order. Those stations are spread across different terrain, not stacked in one air column.</p>
+            </div>
+          </div>
+        </section>
+
+        <section id="rass" aria-labelledby="rass-title">
+          <h2 id="rass-title">What is RASS, and why does it matter to a soaring pilot?</h2>
+          <p>A <strong>Radio Acoustic Sounding System</strong> combines sound and radar to estimate a vertical temperature profile. It lets you look for a warm layer aloft that surface weather stations alone might miss. This page uses NOAA's SBA profile near the coast; it is a sample of the air over that instrument, not a sounding directly above your launch.</p>
+          <p>RASS measures <em>virtual temperature</em>, which includes the effect of moisture on air density. It can differ from a station's ordinary air temperature. Small offsets between the black line and orange squares do not necessarily mean either sensor is wrong. <a href="https://psl.noaa.gov/psd3/boundary/MstToga/profiler_description.html">NOAA explains the measurement.</a></p>
+          <p>The blue dots are interpolated onto 100-meter levels (about 328 feet). Treat small kinks and single-layer extremes cautiously; a smooth line does not mean every displayed level was measured independently. The top of the line is the end of the available profile, not a forecast thermal top.</p>
+        </section>
+
+        <section id="dalr" aria-labelledby="dalr-title">
+          <h2 id="dalr-title">How do I use the dashed DALR line?</h2>
+          <p>The <strong>dry adiabatic lapse rate</strong> is about <strong>9.8°C per kilometer</strong>, or <strong>5.4°F per 1,000 feet</strong>. It describes how an unsaturated parcel cools as it rises. The environmental profile describes the air around that parcel.</p>
+          <p>Compare the profile's cooling rate over a layer with the DALR. Slower environmental cooling tends to erode a dry thermal's temperature advantage. Cooling near the dry rate allows that advantage to persist more readily. An inversion is an especially stable layer. This is the parcel comparison described in the <a href="https://www.faa.gov/regulations_policies/handbooks_manuals/aviation/glider_handbook/gfh_chapter_9.pdf">FAA's soaring-weather chapter</a>.</p>
+          <p>At the same altitude, a black profile to the <strong>right</strong> of the dashed line is warmer than that reference parcel; to the <strong>left</strong>, it is cooler. Always remember which starting temperature the reference represents.</p>
+          <div class="faq-callout"><p><strong>The dashed line starts at the lowest RASS point.</strong> It does not start at today's launch temperature. Its crossing with the black line is therefore not a calculated top of lift. To think about a particular thermal source, imagine a parallel dry-adiabatic line through that source's temperature and altitude.</p></div>
+          <p>Once condensation begins, a parcel cools more slowly than the dry rate. This page does not draw a moist adiabat or calculate a complete parcel ascent.</p>
+        </section>
+
+        <section id="lapse" aria-labelledby="lapse-title">
+          <h2 id="lapse-title">What do numbers like (−6.5) or (+2.0) mean?</h2>
+          <p>They are <strong>temperature changes per 1,000 units of height</strong>: °C per 1,000 m in Metric, or °F per 1,000 ft in Imperial. This page uses a signed temperature gradient: <strong>negative means cooling as you go up; positive means warming as you go up.</strong></p>
+          <ul>
+            <li><strong>Beside a RASS dot:</strong> the rate between that dot and the next plotted dot below it.</li>
+            <li><strong>Beside an orange station:</strong> the rate between that station and the nearest lower station currently plotted.</li>
+            <li><strong>In a station row:</strong> each named comparison is to that lower-elevation station. For example, <code>VOR:−4.0</code> in the La Cumbre row compares La Cumbre with VOR.</li>
+          </ul>
+          <p>Example: if an upper station is 4°F colder than a station 1,000 ft below, its rate is <strong>−4.0°F/1,000 ft</strong>. These numbers are lapse rates, not climb rates or differences from the DALR.</p>
+          <div class="faq-table-wrap">
+            <table>
+              <caption>How the page colors lapse values</caption>
+              <thead><tr><th scope="col">Appearance</th><th scope="col">Imperial<br>°F/1,000 ft</th><th scope="col">Metric, approximately<br>°C/1,000 m</th></tr></thead>
+              <tbody>
+                <tr><td class="faq-red">Red</td><td>Greater than −2.5</td><td>Greater than −4.6</td></tr>
+                <tr><td class="faq-blue">Blue</td><td>Greater than −3.5, through −2.5</td><td>Greater than −6.4, through −4.6</td></tr>
+                <tr><td class="faq-blue"><strong>Bold blue</strong></td><td>−3.5 or more negative</td><td>−6.4 or more negative</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <p><strong>Blue is not a “go fly” signal.</strong> These are the page's comparison bands, not dry-instability thresholds. A bold-blue −3.5°F/1,000 ft still cools more slowly than the dry rate of about −5.4. Red includes weak cooling, constant temperature, and inversions; a <em>positive number</em> identifies warming with height. Rounding can make values at a color boundary look identical.</p>
+        </section>
+
+        <section id="soaring" aria-labelledby="soaring-title">
+          <h2 id="soaring-title">What patterns should I look for before launching?</h2>
+          <ul>
+            <li><strong>A profile bending right with height:</strong> an inversion and a possible cap on thermals. Note its altitude, thickness, and whether it is strengthening or weakening.</li>
+            <li><strong>A nearly vertical section:</strong> little temperature change with height. This is stable for a rising dry thermal even though it is not an inversion.</li>
+            <li><strong>A profile cooling upward near the DALR:</strong> less resistance to a dry thermal retaining its warmth. Surface heating and the depth of that layer still matter.</li>
+            <li><strong>Station temperatures diverging from the RASS:</strong> investigate local slope heating, marine influence, exposure, and observation age before treating the station line as a free-air sounding.</li>
+          </ul>
+          <p>Compare snapshots using the axis values: the chart rescales, so a line's screen angle can change without the same change in lapse rate. Look for a pattern across several levels and observations, rather than making the day hinge on one colored number.</p>
+          <p>This page supplies temperature structure and surface-wind context. It does not calculate climb strength, XC potential, rotor, ridge lift, or a launch decision. Bring in the wind forecast, cloud development, terrain exposure, and actual launch conditions.</p>
+        </section>
+
+        <section id="lcl" aria-labelledby="lcl-title">
+          <h2 id="lcl-title">Is “Estimated LCL @ VOR” the cloud base or top of lift?</h2>
+          <p><strong>LCL</strong> means <strong>lifting condensation level</strong>: an estimate of where air lifted from the VOR station would become saturated. The page uses VOR temperature and dew point, then adds the station elevation:</p>
+          <p class="faq-example">LCL altitude ≈ VOR elevation + 125 × (temperature − dew point)<br>Temperatures in °C; result in meters MSL.</p>
+          <p>A 6°C spread adds about 750 m (2,460 ft) above VOR. With VOR around 1,069 m MSL, that gives an estimated LCL near 1,819 m (5,970 ft) MSL.</p>
+          <p>Use this as cloud-base context for air with VOR's moisture characteristics. It is not an observed ceiling, and it need not match air rising from a lower or moister launch. Thermals may stop below it, or remain blue. Check the timestamp beside the estimate; the headline can retain older VOR data even when that station is no longer plotted.</p>
+        </section>
+
+        <section id="wind" aria-labelledby="wind-title">
+          <h2 id="wind-title">How do I read “winds 230, 8g14mph” and the wind barbs?</h2>
+          <p><strong>230</strong> is the direction the wind is coming <em>from</em>, in degrees: 000/360 is north, 090 east, 180 south, and 270 west. <strong>8g14mph</strong> means 8 mph with gusts to 14 mph. Text wind speeds remain in <strong>mph in both unit modes</strong>.</p>
+          <p>Barbs beside the orange squares use <strong>knots</strong>. The shaft points toward the direction the wind comes from. Add the feathers: a short feather is 5 kt, a long feather 10 kt, and a triangle 50 kt. The page rounds to the nearest 5 kt; a small circle can mean calm or a very light wind rounded to zero. Barbs show speed, not gusts.</p>
+          <p>These are winds at surface stations, including the stations on elevated terrain. They are not a measured vertical wind profile above one location. Terrain sheltering and exposure matter when comparing them with your launch.</p>
+        </section>
+
+        <section id="stations" aria-labelledby="stations-title">
+          <h2 id="stations-title">Which stations am I comparing, and how do I read a row?</h2>
+          <div class="faq-table-wrap">
+            <table>
+              <thead><tr><th scope="col">Chart name</th><th scope="col">Station ID</th><th scope="col">Reference</th></tr></thead>
+              <tbody>
+                <tr><td>La Cumbre</td><td>KC60YN</td><td>La Cumbre station; queried as KC6OYN, with the letter O</td></tr>
+                <tr><td>VOR</td><td>SE068</td><td>VOR-area station; supplies the LCL estimate</td></tr>
+                <tr><td>AntFarm</td><td>SE234</td><td>Antenna Farm area</td></tr>
+                <tr><td>Montecito</td><td>MTIC1</td><td>Montecito station</td></tr>
+                <tr><td>SM Pass</td><td>MPWC1</td><td>San Marcos Pass station</td></tr>
+                <tr><td>Parma</td><td>421SE</td><td>Parma-area station</td></tr>
+                <tr><td>Airport</td><td>KSBA</td><td>Santa Barbara Airport</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <p>Each row below the graph gives the name, ID, elevation, observation time, temperature, wind, then comparisons with lower stations. For example:</p>
+          <p class="faq-example">La Cumbre (KC60YN) 3940ft @ 11:20 – 70.0F, winds 230, 8g14mph, lapse/1000ft VOR:−4.0</p>
+          <p class="faq-small">Illustrative values, not a current observation.</p>
+          <p>That last value means La Cumbre is cooler than VOR by an average of 4°F per 1,000 ft of elevation difference. A small elevation gap can amplify even a modest sensor or exposure difference into a large rate.</p>
+          <p><strong>n/a</strong> means there is no usable lower comparison; this is normal at the lowest station or RASS dot. <strong>missing</strong> means the required observation is absent. A station may remain in the list after its temperature becomes too old to plot, so list comparisons and plotted comparisons can differ.</p>
+        </section>
+
+        <section id="time" aria-labelledby="time-title">
+          <h2 id="time-title">How fresh is the chart? Why is something missing?</h2>
+          <p>Displayed times use <strong>Santa Barbara local time</strong> (PST or PDT). Three clocks matter:</p>
+          <ul>
+            <li><strong>“Refreshed” in the page title:</strong> when that chart snapshot was generated, not when every instrument measured the air.</li>
+            <li><strong>“RASS @” in the legend:</strong> the sounding's observation time. A “fallback” suffix means a saved profile was reused. Profiles more than six hours old are suppressed; “UNAVAILABLE” also removes the DALR reference.</li>
+            <li><strong>“@” in a station row:</strong> the wind observation time when present, otherwise the temperature time. Wind and temperature may come from different observations. The VOR LCL headline uses the temperature time.</li>
+          </ul>
+          <p>Orange squares require a temperature no more than <strong>60 minutes old at the time that snapshot was built</strong>, plus an elevation. The page may reuse saved observations up to 90 minutes old, so the list can retain values no longer recent enough for the graph. A fresh page title alone does not make those values fresh.</p>
+          <p>Missing RASS data means you lack that view of the air aloft; it does not mean the atmosphere is stable or unstable. Missing stations can reflect reporting delays or a feed outage. A partial RASS profile may simply have fewer usable measurements. Work with the observations that are actually present and check their times.</p>
+        </section>
+
+        <section id="controls" aria-labelledby="controls-title">
+          <h2 id="controls-title">How do units and the history arrows work?</h2>
+          <p><strong>Metric / Imperial</strong> switches temperature, altitude, LCL, and lapse-rate units; the browser remembers your choice. Wind text stays in mph and barbs stay in knots.</p>
+          <p><strong>←</strong> opens the previous saved chart; <strong>→</strong> opens the next. The title changes to that snapshot's generation time. About 48 hours of history are retained, with snapshots normally around five minutes apart. Repeated readings are possible when a station or the profiler has not reported again.</p>
+          <p>The right arrow is disabled at the newest snapshot loaded in your browser; the left arrow is disabled at the oldest. <strong>Reload the page to fetch the latest charts and history.</strong> An open tab does not automatically advance as new observations arrive.</p>
+          <p>The “Is today a good day to fly?” link is a joke video, not a weather assessment. Use the observations and your soaring judgment.</p>
+        </section>
+
+        <footer class="faq-footer">
+          <a class="faq-back" href="./">← Back to the lapse chart</a>
+          <p class="faq-small">Written for pilots using SB Live Lapse. The explanations above describe this page's actual labels, calculations, and display behavior.</p>
+        </footer>
+      </div>
+    </div>
+  </main>
+</body>
+</html>
