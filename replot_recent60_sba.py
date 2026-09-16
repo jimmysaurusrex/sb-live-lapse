@@ -33,10 +33,10 @@ STATION_DISPLAY_IDS = {
 RASS_BASE = "https://downloads.psl.noaa.gov/psd2/data/realtime/Radar449/WwTemp/sba/"
 MADIS_BASE = "https://madis-data.ncep.noaa.gov/madisPublic/cgi-bin/madisXmlPublicDir"
 CWOP_XML_BASE = "https://www.findu.com/cgi-bin/wxxml.cgi"
-# findU's public weather endpoint works over HTTP even when its TLS certificate
-# is broken. This explicit, credential-free fallback is limited to findU; HTTPS
-# requests continue to use normal certificate and hostname verification.
-CWOP_XML_FALLBACK_BASE = "http://www.findu.com/cgi-bin/wxxml.cgi"
+# MADIS indexes this CWOP call sign by its assigned ID. See README for evidence.
+MADIS_STATION_IDS = {"KC6OYN": "AV377"}
+FEED_MAX_BYTES = 256 * 1024
+STATION_MAX_AGE = timedelta(minutes=60)
 
 # Repo-relative outputs so GitHub Actions can run this anywhere.
 CHART_PATH = Path("sba_wwtemp_chart.svg")
@@ -54,7 +54,7 @@ FT_PER_M = 3.28084
 KTS_PER_MPS = 1.94384
 PACIFIC = ZoneInfo("America/Los_Angeles")
 HTTP_USER_AGENT = "Mozilla/5.0 (compatible; sb-live-lapse/1.0)"
-CWOP_ELEV_M = {
+STATION_ELEV_M = {
     "KC6OYN": 1201.0,
 }
 LAST_GOOD_GRACE_MIN = 90.0
@@ -84,6 +84,34 @@ def fetch_text(url: str, timeout: int = 25) -> str:
     req = urllib.request.Request(url, headers={"User-Agent": HTTP_USER_AGENT})
     with urllib.request.urlopen(req, timeout=timeout) as response:
         return response.read().decode("utf-8", errors="ignore")
+
+
+class FeedRedirectHandler(urllib.request.HTTPRedirectHandler):
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        # Feed URLs are fixed: fail closed rather than following a downgrade or
+        # silently attributing an observation to a different endpoint.
+        raise ValueError("weather feed redirect refused")
+
+
+def fetch_feed_text(url: str, timeout: int = 25) -> str:
+    if urllib.parse.urlsplit(url).scheme != "https":
+        raise ValueError("weather feeds require HTTPS")
+    req = urllib.request.Request(url, headers={"User-Agent": HTTP_USER_AGENT})
+    # The default HTTPS handler verifies both the certificate and hostname.
+    opener = urllib.request.build_opener(FeedRedirectHandler())
+    with opener.open(req, timeout=timeout) as response:
+        raw = response.read(FEED_MAX_BYTES + 1)
+    if len(raw) > FEED_MAX_BYTES:
+        raise ValueError("weather feed response too large")
+    return raw.decode("utf-8")
+
+
+def parse_feed_xml(raw: str) -> ET.Element:
+    if len(raw.encode("utf-8")) > FEED_MAX_BYTES:
+        raise ValueError("weather feed response too large")
+    if re.search(r"<!\s*(?:DOCTYPE|ENTITY)\b", raw, re.IGNORECASE):
+        raise ValueError("weather feed DTD/entities refused")
+    return ET.fromstring(raw)
 
 
 def fetch_text_with_retry(url: str, timeout: int, retries: int, delay_sec: float) -> str:
@@ -252,7 +280,7 @@ def load_rass_with_fallback() -> Tuple[str, Optional[str], List[Tuple[int, float
     raise RuntimeError("Unable to load RASS data (%s)" % detail)
 
 
-def fetch_station(station_id: str) -> Dict:
+def madis_station_url(station_id: str) -> str:
     params = {
         "time": "0",
         "minbck": "-59",
@@ -261,7 +289,7 @@ def fetch_station(station_id: str) -> Dict:
         "timefilter": "0",
         "dfltrsel": "3",
         "stasel": "1",
-        "stanam": station_id,
+        "stanam": MADIS_STATION_IDS.get(station_id, station_id),
         "pvdrsel": "0",
         "varsel": "2",
         "qctype": "0",
@@ -269,83 +297,85 @@ def fetch_station(station_id: str) -> Dict:
         "xml": "1",
         "csvmiss": "0",
     }
-    url = MADIS_BASE + "?" + urllib.parse.urlencode(params)
+    return MADIS_BASE + "?" + urllib.parse.urlencode(params)
 
-    out = {
-        "id": station_id,
-        "name": STATION_NAMES.get(station_id, station_id),
-        "elev_m": None,
-        "temp_c": None,
-        "dew_c": None,
-        "temp_ob_time": None,
-        "provider": None,
-        "wind_dir": None,
-        "wind_spd_mps": None,
-        "wind_gust_mps": None,
-        "wind_ob_time": None,
+
+def fetch_station(station_id: str, now_utc: Optional[datetime] = None) -> Dict:
+    try:
+        raw = fetch_feed_text(madis_station_url(station_id), timeout=22)
+        return parse_station_madis(station_id, raw, now_utc)
+    except Exception as exc:
+        logging.warning("MADIS %s feed failed: %s", station_id, exc)
+        return blank_station_row(station_id)
+
+
+def parse_station_madis(station_id: str, raw: str, now_utc: Optional[datetime] = None) -> Dict:
+    now_utc = now_utc or datetime.now(timezone.utc)
+    source_id = MADIS_STATION_IDS.get(station_id, station_id)
+    out = blank_station_row(station_id)
+    root = parse_feed_xml(raw)
+    if root.tag != "mesonet":
+        raise ValueError("expected MADIS mesonet response")
+
+    latest: Dict[str, Tuple[datetime, float, str]] = {}
+    any_elev = None
+    # Generous physical bounds; reject missing-value sentinels and non-finite
+    # values before they can reach the chart or last-good cache.
+    bounds = {
+        "V-T": (173.15, 333.15), "V-TD": (173.15, 333.15),
+        "V-DD": (0.0, 360.0), "V-FF": (0.0, 125.0), "V-FFGUST": (0.0, 125.0),
     }
 
-    try:
-        raw = fetch_text(url, timeout=22)
-        root = ET.fromstring(raw)
-    except Exception:
-        return out
-
-    latest: Dict[str, Tuple[str, float, str]] = {}
-    any_elev = None
-
     for rec in root.findall("record"):
+        if rec.get("shef_id") != source_id:
+            continue
         var = rec.attrib.get("var")
-        if var not in ("V-T", "V-TD", "V-DD", "V-FF", "V-FFGUST"):
+        if var not in bounds:
             continue
 
-        ob_time = rec.attrib.get("ObTime")
-        val_s = rec.attrib.get("data_value")
+        ob_time = parse_iso_utc(rec.attrib.get("ObTime"))
+        val = bounded_float(rec.attrib.get("data_value"), *bounds[var])
         provider = rec.attrib.get("provider", "")
-        elev_s = rec.attrib.get("elev")
-
-        if any_elev is None and elev_s:
-            try:
-                any_elev = float(elev_s)
-            except ValueError:
-                pass
-
-        if not ob_time or not val_s:
+        if not fresh_station_time(ob_time, now_utc) or val is None:
             continue
-
-        try:
-            val = float(val_s)
-        except ValueError:
-            continue
-
+        if any_elev is None:
+            any_elev = bounded_float(rec.attrib.get("elev"), -500.0, 9000.0)
         prev = latest.get(var)
         if prev is None or ob_time > prev[0]:
             latest[var] = (ob_time, val, provider)
 
-    out["elev_m"] = any_elev
+    out["elev_m"] = STATION_ELEV_M.get(station_id, any_elev)
 
     if "V-T" in latest:
         t_ob, t_k, provider = latest["V-T"]
         out["temp_c"] = t_k - 273.15
-        out["temp_ob_time"] = t_ob
-        out["provider"] = provider
+        out["temp_ob_time"] = t_ob.strftime("%Y-%m-%dT%H:%M")
+        out["provider"] = f"MADIS-{provider or 'unknown'} ({source_id}; HTTPS)"
+        out["temp_source"] = {
+            "service": "MADIS", "station_id": source_id,
+            "url": madis_station_url(station_id), "transport": "https",
+            "reported_elev_m": any_elev,
+        }
     if "V-TD" in latest:
         _, td_k, _ = latest["V-TD"]
         out["dew_c"] = td_k - 273.15
     if "V-DD" in latest:
         d_ob, d_val, _ = latest["V-DD"]
         out["wind_dir"] = d_val
-        out["wind_ob_time"] = d_ob
+        out["wind_ob_time"] = d_ob.strftime("%Y-%m-%dT%H:%M")
     if "V-FF" in latest:
         f_ob, f_val, _ = latest["V-FF"]
         out["wind_spd_mps"] = f_val
-        if out["wind_ob_time"] is None or f_ob > out["wind_ob_time"]:
-            out["wind_ob_time"] = f_ob
+        if out["wind_ob_time"] is None or f_ob > parse_iso_utc(out["wind_ob_time"]):
+            out["wind_ob_time"] = f_ob.strftime("%Y-%m-%dT%H:%M")
     if "V-FFGUST" in latest:
         g_ob, g_val, _ = latest["V-FFGUST"]
         out["wind_gust_mps"] = g_val
-        if out["wind_ob_time"] is None or g_ob > out["wind_ob_time"]:
-            out["wind_ob_time"] = g_ob
+        if out["wind_ob_time"] is None or g_ob > parse_iso_utc(out["wind_ob_time"]):
+            out["wind_ob_time"] = g_ob.strftime("%Y-%m-%dT%H:%M")
+
+    if out["temp_c"] is not None and out["dew_c"] is not None and out["dew_c"] > out["temp_c"]:
+        out["dew_c"] = None
 
     return out
 
@@ -357,9 +387,19 @@ def parse_float(raw: Optional[str]) -> Optional[float]:
     if not text:
         return None
     try:
-        return float(text)
+        value = float(text)
+        return value if math.isfinite(value) else None
     except ValueError:
         return None
+
+
+def bounded_float(raw: Optional[str], lower: float, upper: float) -> Optional[float]:
+    value = parse_float(raw)
+    return value if value is not None and lower <= value <= upper else None
+
+
+def fresh_station_time(obs_time: Optional[datetime], now_utc: datetime) -> bool:
+    return obs_time is not None and timedelta(0) <= now_utc - obs_time <= STATION_MAX_AGE
 
 
 def parse_iso_utc(iso_time: Optional[str]) -> Optional[datetime]:
@@ -398,11 +438,12 @@ def blank_station_row(station_id: str) -> Dict:
     return {
         "id": station_id,
         "name": STATION_NAMES.get(station_id, station_id),
-        "elev_m": None,
+        "elev_m": STATION_ELEV_M.get(station_id),
         "temp_c": None,
         "dew_c": None,
         "temp_ob_time": None,
         "provider": None,
+        "temp_source": None,
         "wind_dir": None,
         "wind_spd_mps": None,
         "wind_gust_mps": None,
@@ -414,31 +455,28 @@ def station_display_id(station_id: str) -> str:
     return STATION_DISPLAY_IDS.get(station_id, station_id)
 
 
-def fetch_station_cwop(station_id: str) -> Dict:
+def fetch_station_cwop(station_id: str, now_utc: Optional[datetime] = None) -> Dict:
     query = urllib.parse.urlencode({"call": station_id, "last": "2"})
-    for base in (CWOP_XML_BASE, CWOP_XML_FALLBACK_BASE):
-        url = base + "?" + query
-        try:
-            out = parse_station_cwop(station_id, fetch_text(url, timeout=18))
-            if out.get("temp_c") is None:
-                raise ValueError("no usable temperature report")
-        except Exception as exc:
-            logging.warning("CWOP %s feed failed (%s): %s", station_id, base, exc)
-            continue
-        if base == CWOP_XML_FALLBACK_BASE:
-            logging.warning("CWOP %s using public HTTP fallback: %s", station_id, base)
+    url = CWOP_XML_BASE + "?" + query
+    try:
+        out = parse_station_cwop(station_id, fetch_feed_text(url, timeout=18), now_utc)
+        if out.get("temp_c") is None:
+            raise ValueError("no usable recent temperature report")
+        out["provider"] = f"CWOP-findU ({station_id}; HTTPS)"
+        out["temp_source"] = {
+            "service": "findU", "station_id": station_id, "url": url, "transport": "https",
+        }
         return out
+    except Exception as exc:
+        logging.warning("CWOP %s HTTPS feed failed: %s", station_id, exc)
+        return blank_station_row(station_id)
 
+
+def parse_station_cwop(station_id: str, raw: str, now_utc: Optional[datetime] = None) -> Dict:
+    now_utc = now_utc or datetime.now(timezone.utc)
     out = blank_station_row(station_id)
-    out["elev_m"] = CWOP_ELEV_M.get(station_id)
-    return out
 
-
-def parse_station_cwop(station_id: str, raw: str) -> Dict:
-    out = blank_station_row(station_id)
-    out["elev_m"] = CWOP_ELEV_M.get(station_id)
-
-    root = ET.fromstring(raw)
+    root = parse_feed_xml(raw)
     if root.tag != "station" or (root.findtext("call") or "").strip().upper() != station_id.upper():
         raise ValueError("response does not match requested station")
 
@@ -452,6 +490,10 @@ def parse_station_cwop(station_id: str, raw: str) -> Dict:
             dt_utc = datetime.strptime(ts, "%Y%m%d%H%M%S").replace(tzinfo=timezone.utc)
         except ValueError:
             continue
+        if not fresh_station_time(dt_utc, now_utc):
+            continue
+        if bounded_float(rep.findtext("temperature"), -148.0, 140.0) is None:
+            continue
         if latest_dt is None or dt_utc > latest_dt:
             latest_dt = dt_utc
             latest_rep = rep
@@ -459,11 +501,11 @@ def parse_station_cwop(station_id: str, raw: str) -> Dict:
     if latest_dt is None or latest_rep is None:
         return out
 
-    temp_f = parse_float(latest_rep.findtext("temperature"))
-    rh_pct = parse_float(latest_rep.findtext("humidity"))
-    wind_dir = parse_float(latest_rep.findtext("windDirection"))
-    wind_spd_mph = parse_float(latest_rep.findtext("windSpeed"))
-    wind_gust_mph = parse_float(latest_rep.findtext("windGust"))
+    temp_f = bounded_float(latest_rep.findtext("temperature"), -148.0, 140.0)
+    rh_pct = bounded_float(latest_rep.findtext("humidity"), 0.0, 100.0)
+    wind_dir = bounded_float(latest_rep.findtext("windDirection"), 0.0, 360.0)
+    wind_spd_mph = bounded_float(latest_rep.findtext("windSpeed"), 0.0, 125.0 * MS_TO_MPH)
+    wind_gust_mph = bounded_float(latest_rep.findtext("windGust"), 0.0, 125.0 * MS_TO_MPH)
 
     obs_iso = latest_dt.strftime("%Y-%m-%dT%H:%M")
     if temp_f is not None:
@@ -492,7 +534,7 @@ def update_age_and_recency(row: Dict, now_utc: datetime) -> None:
     dt_utc = parse_iso_utc(row.get("temp_ob_time"))
     if dt_utc is not None:
         row["age_min"] = (now_utc - dt_utc).total_seconds() / 60.0
-        row["recent"] = row["age_min"] <= 60.0
+        row["recent"] = 0.0 <= row["age_min"] <= 60.0
 
 
 def should_try_cwop(row: Dict) -> bool:
@@ -507,9 +549,8 @@ def merge_cwop_if_needed(madis_row: Dict, cwop_row: Dict) -> Dict:
         return madis_row
 
     merged = dict(madis_row)
-    for key in ("temp_c", "dew_c", "temp_ob_time", "wind_dir", "wind_spd_mps", "wind_gust_mps", "wind_ob_time"):
-        if cwop_row.get(key) is not None:
-            merged[key] = cwop_row[key]
+    for key in ("temp_c", "dew_c", "temp_ob_time", "temp_source", "wind_dir", "wind_spd_mps", "wind_gust_mps", "wind_ob_time"):
+        merged[key] = cwop_row.get(key)
     if merged.get("elev_m") is None and cwop_row.get("elev_m") is not None:
         merged["elev_m"] = cwop_row["elev_m"]
     if cwop_row.get("temp_ob_time") is not None:
@@ -543,6 +584,8 @@ def normalize_state_row(station_id: str, raw: Dict) -> Dict:
     row = blank_station_row(station_id)
     row["name"] = str(raw.get("name") or row["name"])
     row["provider"] = str(raw["provider"]) if raw.get("provider") else None
+    if isinstance(raw.get("temp_source"), dict):
+        row["temp_source"] = dict(raw["temp_source"])
 
     for key in ("elev_m", "temp_c", "dew_c", "wind_dir", "wind_spd_mps", "wind_gust_mps"):
         row[key] = parse_float(str(raw[key])) if raw.get(key) is not None else None
@@ -875,7 +918,7 @@ def age_minutes(iso_time: Optional[str], now_utc: datetime) -> Optional[float]:
 
 def within_grace(iso_time: Optional[str], now_utc: datetime) -> bool:
     age = age_minutes(iso_time, now_utc)
-    return age is not None and age <= LAST_GOOD_GRACE_MIN
+    return age is not None and 0.0 <= age <= LAST_GOOD_GRACE_MIN
 
 
 def apply_last_good_fallback(current_row: Dict, cached_row: Dict, now_utc: datetime) -> Dict:
@@ -895,6 +938,8 @@ def apply_last_good_fallback(current_row: Dict, cached_row: Dict, now_utc: datet
     if merged.get("temp_c") is None and temp_cache_ok and cached_row.get("temp_c") is not None:
         merged["temp_c"] = cached_row["temp_c"]
         merged["temp_ob_time"] = cached_row.get("temp_ob_time")
+        merged["provider"] = cached_row.get("provider")
+        merged["temp_source"] = cached_row.get("temp_source")
         used_cache = True
     if merged.get("dew_c") is None and temp_cache_ok and cached_row.get("dew_c") is not None:
         merged["dew_c"] = cached_row["dew_c"]
@@ -938,6 +983,7 @@ def station_payload(row: Dict) -> Dict:
         "dew_c": row.get("dew_c"),
         "temp_ob_time": row.get("temp_ob_time"),
         "provider": row.get("provider"),
+        "temp_source": row.get("temp_source"),
         "wind_dir": row.get("wind_dir"),
         "wind_spd_mps": row.get("wind_spd_mps"),
         "wind_gust_mps": row.get("wind_gust_mps"),
@@ -1602,9 +1648,8 @@ def draw_svg(
 
 
 def main() -> None:
-    now_utc = datetime.now(timezone.utc)
-
     filename, rass_time_utc, rass_points, rass_source = load_rass_with_fallback()
+    now_utc = datetime.now(timezone.utc)
     rass_available = rass_is_available(rass_time_utc, now_utc)
 
     stations: List[Dict] = []
@@ -1616,6 +1661,9 @@ def main() -> None:
     order = {station: i for i, station in enumerate(STATIONS)}
     stations.sort(key=lambda r: order[r["id"]])
 
+    # Validate against receipt time, not the run's start: slow upstream requests
+    # can span a new observation without making that observation "future" data.
+    now_utc = datetime.now(timezone.utc)
     for row in stations:
         update_age_and_recency(row, now_utc)
 
@@ -1634,6 +1682,7 @@ def main() -> None:
                 stations[i] = merge_cwop_if_needed(row, cwop_row)
 
     last_good = load_last_good_state()
+    now_utc = datetime.now(timezone.utc)
     for i, row in enumerate(stations):
         cached = last_good.get(row["id"])
         if cached is not None:
