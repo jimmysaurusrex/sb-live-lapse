@@ -12,6 +12,36 @@ The new droplet workflow is intentionally conservative by default. Manual drople
 
 ## Station feeds
 
+MADIS is the primary feed for all seven stations. If it has no usable recent
+temperature for VOR, AntFarm, Montecito, SM Pass, Parma, or Airport, the refresh
+uses the station's public [MesoWest observation table](https://mesowest.utah.edu/cgi-bin/droman/meso_table_mesodyn.cgi?stn=SE068&unit=1&time=GMT&past=0&order=1)
+over certificate-verified HTTPS. This fallback needs no API key. findU is only
+queried for the actual CWOP call sign `KC6OYN`, not RAWS, SCE, or airport IDs.
+
+On September 19, 2026, MADIS returned empty mesonets for the five RAWS/SCE
+stations above. The NWS observation API was also stuck at 12:06–12:50 UTC,
+while direct MesoWest tables contained observations at 14:47–15:06 UTC. This was
+an upstream distribution outage, not five failed station instruments. A wider
+MADIS time window and disabling its QC filter did not recover the observations.
+
+The MesoWest parser checks station identity, UTC dates, explicit Celsius and m/s
+column headings, finite physical bounds, and the same 0–60 minute freshness
+limit as MADIS. It reads dated observation rows rather than the summary table
+(which can contain older values), handles UTC midnight, and keeps wind/dewpoint
+with the selected temperature report. RAWS sensor-height prefixes and missing
+optional fields are supported. Compass winds are converted to degrees at the
+table's 22.5-degree resolution. Existing MADIS station elevations are retained
+because the observation tables omit elevation. Sources and original timestamps
+are recorded in state/history and survive the last-good cache.
+
+Malformed, stale, empty, or unavailable sources are logged and isolated to that
+station. Regression fixtures in `tests/fixtures/` contain the header and first
+three observations captured from each fallback station on September 19.
+Maintenance note: [MesoWest](https://mesowest.utah.edu/) announces a December 31,
+2026 sunset; migrate this fallback before then.
+
+### La Cumbre
+
 La Cumbre retains internal call sign `KC6OYN` (letter O) and display ID `KC60YN`.
 Its normal source is NOAA MADIS over certificate-verified HTTPS, queried with
 the assigned MADIS ID **`AV377`**. The previous `stanam=KC6OYN` query returned an

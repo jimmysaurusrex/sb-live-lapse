@@ -9,6 +9,7 @@ import urllib.parse
 import urllib.request
 import xml.etree.ElementTree as ET
 from html import escape as html_escape
+from html.parser import HTMLParser
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -33,6 +34,14 @@ STATION_DISPLAY_IDS = {
 RASS_BASE = "https://downloads.psl.noaa.gov/psd2/data/realtime/Radar449/WwTemp/sba/"
 MADIS_BASE = "https://madis-data.ncep.noaa.gov/madisPublic/cgi-bin/madisXmlPublicDir"
 CWOP_XML_BASE = "https://www.findu.com/cgi-bin/wxxml.cgi"
+MESOWEST_BASE = "https://mesowest.utah.edu/cgi-bin/droman/meso_table_mesodyn.cgi"
+# Existing MADIS elevations, retained when its response is empty. MesoWest's
+# observation table does not include station elevation.
+MESOWEST_ELEV_M = {
+    "SE068": 1069.2, "SE234": 717.8, "MTIC1": 493.5,
+    "MPWC1": 454.5, "421SE": 237.7, "KSBA": 3.0,
+}
+CWOP_STATIONS = {"KC6OYN"}
 # MADIS indexes this CWOP call sign by its assigned ID. See README for evidence.
 MADIS_STATION_IDS = {"KC6OYN": "AV377"}
 FEED_MAX_BYTES = 256 * 1024
@@ -303,7 +312,10 @@ def madis_station_url(station_id: str) -> str:
 def fetch_station(station_id: str, now_utc: Optional[datetime] = None) -> Dict:
     try:
         raw = fetch_feed_text(madis_station_url(station_id), timeout=22)
-        return parse_station_madis(station_id, raw, now_utc)
+        row = parse_station_madis(station_id, raw, now_utc)
+        if row.get("temp_c") is None:
+            logging.warning("MADIS %s: no usable recent temperature", station_id)
+        return row
     except Exception as exc:
         logging.warning("MADIS %s feed failed: %s", station_id, exc)
         return blank_station_row(station_id)
@@ -455,6 +467,158 @@ def station_display_id(station_id: str) -> str:
     return STATION_DISPLAY_IDS.get(station_id, station_id)
 
 
+class MesoWestTableParser(HTMLParser):
+    """Read table cells, including the site's implicitly closed HTML rows."""
+
+    def __init__(self):
+        super().__init__(convert_charrefs=True)
+        self.tables = []
+        self.table = None
+        self.row = None
+        self.cell = None
+        self.text = []
+        self.title = []
+        self.in_title = False
+
+    def finish_cell(self):
+        if self.cell is not None and self.row is not None:
+            self.row.append(" ".join("".join(self.cell).split()))
+        self.cell = None
+
+    def finish_row(self):
+        self.finish_cell()
+        if self.row and self.table is not None:
+            self.table.append(self.row)
+        self.row = None
+
+    def handle_starttag(self, tag, attrs):
+        if tag == "title":
+            self.in_title = True
+        elif tag == "table":
+            self.finish_row()
+            self.table = []
+        elif tag == "tr" and self.table is not None:
+            self.finish_row()
+            self.row = []
+        elif tag in ("td", "th") and self.row is not None:
+            self.finish_cell()
+            self.cell = []
+        elif tag == "br" and self.cell is not None:
+            self.cell.append(" ")
+
+    def handle_endtag(self, tag):
+        if tag == "title":
+            self.in_title = False
+        elif tag in ("td", "th"):
+            self.finish_cell()
+        elif tag == "tr":
+            self.finish_row()
+        elif tag == "table":
+            self.finish_row()
+            if self.table is not None:
+                self.tables.append(self.table)
+            self.table = None
+
+    def handle_data(self, data):
+        self.text.append(data)
+        if self.in_title:
+            self.title.append(data)
+        if self.cell is not None:
+            self.cell.append(data)
+
+
+def mesowest_station_url(station_id: str) -> str:
+    return MESOWEST_BASE + "?" + urllib.parse.urlencode({
+        "stn": station_id, "unit": "1", "time": "GMT", "past": "0", "order": "1",
+    })
+
+
+def parse_station_mesowest(station_id: str, raw: str, now_utc: Optional[datetime] = None) -> Dict:
+    now_utc = now_utc or datetime.now(timezone.utc)
+    if station_id not in MESOWEST_ELEV_M:
+        raise ValueError("station has no configured MesoWest fallback")
+    if len(raw.encode("utf-8")) > FEED_MAX_BYTES:
+        raise ValueError("weather feed response too large")
+    parser = MesoWestTableParser()
+    parser.feed(raw)
+    parser.close()
+    if " ".join("".join(parser.title).split()) != f"{station_id} Weather Conditions":
+        raise ValueError("MesoWest response does not match requested station")
+
+    # Use the dated observation listing, not 'Current Time' or the summary,
+    # whose individual values can silently come from older observations.
+    text = " ".join(" ".join(parser.text).split())
+    listing = re.search(
+        r"Tabular Listing of \d+ Observations from (\d{2}/\d{2}/\d{4} \d{1,2}:\d{2}) GMT "
+        r"to (\d{2}/\d{2}/\d{4} \d{1,2}:\d{2}) GMT \(ordered last to first\)", text)
+    if listing is None:
+        raise ValueError("MesoWest dated UTC observation listing missing")
+    start, end = [datetime.strptime(s, "%m/%d/%Y %H:%M").replace(tzinfo=timezone.utc)
+                  for s in listing.groups()]
+    if start > end:
+        raise ValueError("MesoWest observation date range reversed")
+
+    table = next((t for t in parser.tables if t and t[0] and t[0][0] == "Time (GMT)"), None)
+    if table is None:
+        raise ValueError("MesoWest UTC observation table missing")
+    # RAWS labels include sensor heights (e.g. '2.0m Temperature'). Never
+    # confuse Fuel Temperature with air temperature or assume column order.
+    headers = [re.sub(r"^\d+(?:\.\d+)?m\s+", "", h) for h in table[0]]
+    if headers.count("Temperature ° C") != 1:
+        raise ValueError("MesoWest Celsius air temperature column missing or ambiguous")
+
+    out = blank_station_row(station_id)
+    out["elev_m"] = MESOWEST_ELEV_M[station_id]
+    previous = end
+    directions = "N NNE NE ENE E ESE SE SSE S SSW SW WSW W WNW NW NNW".split()
+    for cells in table[1:]:
+        if not cells or not re.fullmatch(r"\d{1,2}:\d{2}", cells[0]):
+            continue
+        try:
+            hour, minute = map(int, cells[0].split(":"))
+            observed = previous.replace(hour=hour, minute=minute)
+        except ValueError:
+            continue
+        if observed > previous:
+            observed -= timedelta(days=1)
+        previous = observed
+        if not start <= observed <= end or not fresh_station_time(observed, now_utc):
+            continue
+        values = dict(zip(headers, cells))
+        temp = bounded_float(values.get("Temperature ° C"), -100.0, 60.0)
+        if temp is None:
+            continue
+        out["temp_c"] = temp
+        out["temp_ob_time"] = observed.strftime("%Y-%m-%dT%H:%M")
+        dew = bounded_float(values.get("Dew Point ° C"), -100.0, 60.0)
+        out["dew_c"] = dew if dew is not None and dew <= temp else None
+        direction = values.get("Wind Direction", "")
+        out["wind_dir"] = directions.index(direction) * 22.5 if direction in directions else None
+        out["wind_spd_mps"] = bounded_float(values.get("Wind Speed m/s"), 0.0, 125.0)
+        out["wind_gust_mps"] = bounded_float(values.get("Wind Gust m/s"), 0.0, 125.0)
+        if any(out[k] is not None for k in ("wind_dir", "wind_spd_mps", "wind_gust_mps")):
+            out["wind_ob_time"] = out["temp_ob_time"]
+        out["provider"] = f"MesoWest ({station_id}; HTTPS)"
+        out["temp_source"] = {
+            "service": "MesoWest", "station_id": station_id,
+            "url": mesowest_station_url(station_id), "transport": "https",
+        }
+        return out
+    return out
+
+
+def fetch_station_mesowest(station_id: str, now_utc: Optional[datetime] = None) -> Dict:
+    try:
+        raw = fetch_feed_text(mesowest_station_url(station_id), timeout=22)
+        row = parse_station_mesowest(station_id, raw, now_utc)
+        if row.get("temp_c") is None:
+            raise ValueError("no usable recent temperature report")
+        return row
+    except Exception as exc:
+        logging.warning("MesoWest %s HTTPS feed failed: %s", station_id, exc)
+        return blank_station_row(station_id)
+
+
 def fetch_station_cwop(station_id: str, now_utc: Optional[datetime] = None) -> Dict:
     query = urllib.parse.urlencode({"call": station_id, "last": "2"})
     url = CWOP_XML_BASE + "?" + query
@@ -538,11 +702,11 @@ def update_age_and_recency(row: Dict, now_utc: datetime) -> None:
 
 
 def should_try_cwop(row: Dict) -> bool:
-    return row.get("temp_c") is None or not row.get("recent")
+    return row.get("id") in CWOP_STATIONS and (row.get("temp_c") is None or not row.get("recent"))
 
 
-def merge_cwop_if_needed(madis_row: Dict, cwop_row: Dict) -> Dict:
-    if cwop_row.get("temp_c") is None:
+def merge_station_if_needed(madis_row: Dict, fallback_row: Dict) -> Dict:
+    if fallback_row.get("temp_c") is None:
         return madis_row
 
     if madis_row.get("temp_c") is not None and madis_row.get("recent"):
@@ -550,11 +714,11 @@ def merge_cwop_if_needed(madis_row: Dict, cwop_row: Dict) -> Dict:
 
     merged = dict(madis_row)
     for key in ("temp_c", "dew_c", "temp_ob_time", "temp_source", "wind_dir", "wind_spd_mps", "wind_gust_mps", "wind_ob_time"):
-        merged[key] = cwop_row.get(key)
-    if merged.get("elev_m") is None and cwop_row.get("elev_m") is not None:
-        merged["elev_m"] = cwop_row["elev_m"]
-    if cwop_row.get("temp_ob_time") is not None:
-        merged["provider"] = cwop_row.get("provider") or "CWOP-findU"
+        merged[key] = fallback_row.get(key)
+    if merged.get("elev_m") is None and fallback_row.get("elev_m") is not None:
+        merged["elev_m"] = fallback_row["elev_m"]
+    if fallback_row.get("temp_ob_time") is not None:
+        merged["provider"] = fallback_row.get("provider")
     return merged
 
 
@@ -1667,6 +1831,14 @@ def main() -> None:
     for row in stations:
         update_age_and_recency(row, now_utc)
 
+    mesowest_targets = [row["id"] for row in stations if row["id"] in MESOWEST_ELEV_M
+                        and (row.get("temp_c") is None or not row.get("recent"))]
+    if mesowest_targets:
+        with ThreadPoolExecutor(max_workers=4) as pool:
+            fallback_rows = {row["id"]: row for row in pool.map(fetch_station_mesowest, mesowest_targets)}
+        stations = [merge_station_if_needed(row, fallback_rows[row["id"]])
+                    if row["id"] in fallback_rows else row for row in stations]
+
     cwop_targets = [row["id"] for row in stations if should_try_cwop(row)]
     if cwop_targets:
         cwop_rows: Dict[str, Dict] = {}
@@ -1679,7 +1851,7 @@ def main() -> None:
         for i, row in enumerate(stations):
             cwop_row = cwop_rows.get(row["id"])
             if cwop_row is not None:
-                stations[i] = merge_cwop_if_needed(row, cwop_row)
+                stations[i] = merge_station_if_needed(row, cwop_row)
 
     last_good = load_last_good_state()
     now_utc = datetime.now(timezone.utc)

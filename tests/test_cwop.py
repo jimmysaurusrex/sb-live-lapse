@@ -113,14 +113,14 @@ class CwopTests(unittest.TestCase):
         chart.update_age_and_recency(madis, NOW)
         cwop = chart.parse_station_cwop("KC6OYN", REPORTS, NOW)
         self.assertFalse(chart.should_try_cwop(madis))
-        self.assertIs(chart.merge_cwop_if_needed(madis, cwop), madis)
+        self.assertIs(chart.merge_station_if_needed(madis, cwop), madis)
 
     def test_cwop_replaces_stale_madis_and_preserves_provenance(self):
         madis = dict(chart.blank_station_row("KC6OYN"), temp_c=21, dew_c=20,
                      temp_ob_time="2026-09-16T19:00", recent=False)
         with patch.object(chart, "fetch_feed_text", return_value=REPORTS.replace("<humidity>41", "<humidity>101")):
             cwop = chart.fetch_station_cwop("KC6OYN", NOW)
-        merged = chart.merge_cwop_if_needed(madis, cwop)
+        merged = chart.merge_station_if_needed(madis, cwop)
         self.assertEqual(merged["temp_source"], cwop["temp_source"])
         self.assertIsNone(merged["dew_c"])
 
