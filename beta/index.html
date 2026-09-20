@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex">
+  <title>Clouds & lapse · SB Live Lapse beta</title>
+  <link rel="stylesheet" href="./styles.css">
+  <script type="module" src="./app.mjs"></script>
+</head>
+<body>
+  <main>
+    <header class="page-header">
+      <div><a class="home-link" href="/">SB Live Lapse ↗</a><span class="beta-tag">BETA</span>
+        <h1>Clouds & lapse</h1><p class="subtitle">Santa Barbara coast, foothills & ridge</p></div>
+      <div class="refresh"><p id="updated" aria-live="polite">Loading observations…</p><button id="refresh" type="button">Refresh observations ↻</button></div>
+    </header>
+    <p id="notice" class="notice" role="status" hidden></p>
+    <section class="readouts" aria-label="Conditions at a glance">
+      <div><span class="eyebrow">OBSERVED · AIRPORT</span><strong id="cloud-value">—</strong><p id="cloud-detail">Loading cloud observations</p></div>
+      <div><span class="eyebrow">INFERRED · SURFACE STATIONS</span><strong id="saturation-value">—</strong><p id="saturation-detail">Near saturation; possible cloud or fog</p></div>
+      <div><span class="eyebrow">ESTIMATED · VOR</span><strong id="lcl-value">—</strong><p id="lcl-detail">Lifting condensation level</p></div>
+    </section>
+    <section class="chart-panel" aria-labelledby="profile-heading">
+      <div class="chart-toolbar">
+        <div><h2 id="profile-heading">Temperature, moisture & cloud base</h2><p>All elevations above sea level</p></div>
+        <div class="units" role="group" aria-label="Chart units"><button id="metric" aria-pressed="true">°C / m</button><button id="imperial" aria-pressed="false">°F / ft</button></div>
+      </div>
+      <div class="layer-controls" aria-label="Chart layers">
+        <label><input id="dew-toggle" type="checkbox" checked> Dew point & saturation</label>
+        <label><input id="cloud-toggle" type="checkbox" checked> Observed airport clouds</label>
+        <label><input id="lcl-toggle" type="checkbox" checked> Estimated VOR LCL</label>
+      </div>
+      <div class="plot-scroll" tabindex="0" aria-label="Weather profile chart; scroll horizontally on small screens">
+        <svg id="plot" viewBox="0 0 1080 630" role="img" aria-labelledby="plot-title plot-description"></svg>
+      </div>
+      <p class="scroll-hint">Swipe the chart sideways to see station labels and cloud bases →</p>
+      <div class="legend">
+        <span><i class="key-square"></i> Station temperature</span><span><i class="key-dot"></i> Dew point</span>
+        <span><i class="key-ring"></i> Near saturation</span><span><i class="key-line"></i> RASS profile</span><span><i class="key-dash"></i> Dry adiabatic reference</span>
+      </div>
+      <p class="chart-note" id="rass-status">Checking RASS profile…</p>
+      <p class="chart-note">Cloud markers show bases observed over KSBA; cloud tops are unknown. Stations sample different terrain, so their elevations do not define a continuous cloud layer.</p>
+    </section>
+    <section class="station-section" aria-labelledby="station-heading">
+      <div class="section-heading"><h2 id="station-heading">At each station</h2><p>Near saturation: temperature − dew point ≤ 1°C (1.8°F)</p></div>
+      <div class="table-scroll"><table><thead><tr><th>Station</th><th id="elevation-heading">Elevation</th><th>Temperature</th><th>Dew point</th><th>Spread</th><th>Wind</th><th>Observation</th><th>Moisture signal</th></tr></thead><tbody id="station-rows"></tbody></table></div>
+      <p class="chart-note">Near saturation suggests possible cloud or fog; it is not a cloud detection. Temperature and dew point are the latest available fields and may differ in observation time. Cached readings are labeled and excluded from saturation flags.</p>
+    </section>
+    <section class="context-section" aria-labelledby="context-heading">
+      <div class="section-heading"><h2 id="context-heading">Look at the cloud</h2><p>Regional coverage and a local camera view</p></div>
+      <div class="context-grid">
+        <article class="context-card">
+          <div class="card-heading"><h3>GOES-West · coastal Southern California</h3><span class="source-tag">SATELLITE</span></div>
+          <a id="satellite-link" href="https://www.star.nesdis.noaa.gov/GOES/wfo.php?wfo=lox" target="_blank" rel="noopener noreferrer" class="image-link satellite-view"><img id="satellite-image" alt="GOES-West GeoColor satellite view of the Los Angeles and Oxnard forecast region" hidden><span id="satellite-placeholder">Loading satellite image…</span></a>
+          <div class="card-copy"><p id="satellite-time" class="source-time">—</p><p>Visible cloud patterns by day; low water clouds appear blue at night. This view shows regional coverage, not a measured cloud base.</p><a href="https://www.star.nesdis.noaa.gov/GOES/wfo.php?wfo=lox" target="_blank" rel="noopener noreferrer">Open satellite & animation ↗</a><small>CIRA/NOAA</small></div>
+        </article>
+        <article class="context-card">
+          <div class="card-heading"><h3>Gibraltar 2 · near AntFarm</h3><span class="source-tag">CAMERA</span></div>
+          <a href="https://ops.alertcalifornia.org/cam-console/1986" target="_blank" rel="noopener noreferrer" class="image-link camera-view"><img id="camera-image" alt="Latest public Gibraltar 2 camera image from ALERTCalifornia" hidden><span id="camera-placeholder">Loading camera preview…</span></a>
+          <div class="card-copy"><p id="camera-time" class="source-time">—</p><p id="camera-direction">Gibraltar 2 is about 0.4 mi (0.67 km) south of the AntFarm weather station. The camera can rotate; its image represents its current viewing direction.</p><a href="https://ops.alertcalifornia.org/cam-console/1986" target="_blank" rel="noopener noreferrer">Open live camera & timelapse ↗</a><small>ALERTCalifornia | UC San Diego</small></div>
+        </article>
+      </div>
+    </section>
+    <section class="reading-notes">
+      <details><summary>How to read the cloud evidence</summary><div class="notes-grid">
+        <p><b>Observed cloud base.</b> Airport cloud-base heights come from KSBA METAR reports. Scattered, broken and overcast describe coverage there. Airport elevation is added to align the report with this chart. A clear report applies to the sensor’s coverage, not the whole region.</p>
+        <p><b>Near saturation.</b> The cyan dew-point dot approaches the orange temperature square as the air gets closer to saturation. The halo is a moisture hint at that station, with no claim about cloud elsewhere. Sensor uncertainty matters near the threshold.</p>
+        <p><b>Estimated LCL.</b> The dashed gold marker estimates where air lifted from VOR would reach saturation. It is a parcel estimate, not an observation of existing cloud. It can differ from the marine-layer cloud base.</p>
+      </div></details>
+      <details><summary>Airport report & data sources</summary><pre id="metar-report">Loading METAR…</pre><p id="airport-time"></p><p><a href="https://aviationweather.gov/data/metar/?id=KSBA" target="_blank" rel="noopener noreferrer">NOAA aviation observations ↗</a> · <a href="../station_state.json" target="_blank" rel="noopener noreferrer">Station data ↗</a> · <a href="./data.json" target="_blank" rel="noopener noreferrer">Beta observations ↗</a></p></details>
+    </section>
+    <footer><span>Experimental cloud context · check observation times before interpreting.</span><a href="/">Return to the primary chart ↗</a></footer>
+  </main>
+</body>
+</html>

@@ -1,0 +1,92 @@
+{
+  "code": 1,
+  "data": {
+    "cams": {
+      "data": [
+        {
+          "ato": 1,
+          "p": "176.34",
+          "t": "-7.77",
+          "z": "1",
+          "af": 1,
+          "foc": "7749",
+          "br": "5000",
+          "ptz": 1,
+          "id": "1986",
+          "pv": 0,
+          "lmt": "1789368446",
+          "lid": 388,
+          "cn": "Gibraltar_2",
+          "hn": "Axis-Gibraltar2",
+          "img": "Gibraltar_2_1789916476_2697.jpg",
+          "off": 0,
+          "cl": 117,
+          "isp": "Becknet",
+          "typ": "6",
+          "cc": "axis",
+          "fov": "65.33",
+          "sp": "PG&E",
+          "co": "SantaBarbara",
+          "st": "CA",
+          "pr": "UCSD",
+          "pl": "https://alertcalifornia.org/",
+          "pi": "/img/alertcalifornia-ucsd-logo.png",
+          "ps": "/img/alertcalifornia-ucsd-logo-actually-square.png",
+          "tb": 1,
+          "trg": 0
+        }
+      ],
+      "key": {
+        "ato": "camAutoTargetOverride",
+        "p": "camAzimuth",
+        "t": "camElevation",
+        "z": "camZoom",
+        "af": "camAutoFocus",
+        "foc": "camFocus",
+        "br": "camBrightness",
+        "ptz": "camHasPTZ",
+        "id": "camId",
+        "pv": "camPrivate",
+        "lmt": "camLastMoved",
+        "lid": "camLocation",
+        "cn": "camName",
+        "hn": "camHostname",
+        "img": "camScreenshot",
+        "off": "camOffline",
+        "cl": "camLatency",
+        "isp": "camIsp",
+        "typ": "camType",
+        "cc": "camClass",
+        "fov": "camViewWidth",
+        "sp": "camSponsor",
+        "co": "camCounty",
+        "st": "camState",
+        "pr": "camProviderName",
+        "pl": "camProviderLink",
+        "pi": "camProviderLogo",
+        "ps": "camProviderLogoSquare",
+        "tb": "camTourable",
+        "trg": "camTouring",
+        "tr": "camTour"
+      }
+    },
+    "locs": {
+      "data": [
+        {
+          "id": 388,
+          "lat": "34.465286",
+          "lon": "-119.678314",
+          "st": "CA",
+          "lp": 0
+        }
+      ],
+      "key": {
+        "id": "locId",
+        "lat": "locLat",
+        "lon": "locLon",
+        "st": "locState",
+        "lp": "locPrivate"
+      }
+    }
+  }
+}
