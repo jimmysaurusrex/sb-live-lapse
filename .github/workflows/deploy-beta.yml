@@ -1,4 +1,4 @@
-name: Deploy Isolated Cloud Beta
+name: Validate Isolated Cloud Beta
 on:
   push:
     branches: [codex/cloud-beta]
@@ -7,10 +7,10 @@ on:
 permissions:
   contents: read
 concurrency:
-  group: cloud-beta-deploy
+  group: cloud-beta-validation
   cancel-in-progress: false
 jobs:
-  deploy-beta:
+  validate-beta:
     runs-on: ubuntu-latest
     timeout-minutes: 8
     steps:
@@ -26,50 +26,4 @@ jobs:
           python3 -m unittest discover -s tests -v
           python3 -m unittest discover -s beta/tests -v
           node --test beta/tests/model.test.mjs
-          bash -n beta/deploy/install.sh beta/deploy/refresh.sh
-      - name: Configure existing deployment credentials
-        env:
-          DO_HOST: ${{ secrets.DO_HOST }}
-          DO_PORT: ${{ secrets.DO_PORT }}
-          DO_USER: ${{ secrets.DO_USER }}
-          DO_SSH_PRIVATE_KEY: ${{ secrets.DO_SSH_PRIVATE_KEY }}
-        run: |
-          set -Eeuo pipefail
-          : "${DO_HOST:?}" "${DO_USER:?}" "${DO_SSH_PRIVATE_KEY:?}"
-          mkdir -p "${HOME}/.ssh"
-          chmod 700 "${HOME}/.ssh"
-          printf '%s\n' "$DO_SSH_PRIVATE_KEY" | tr -d '\r' > "${HOME}/.ssh/id_ed25519"
-          chmod 600 "${HOME}/.ssh/id_ed25519"
-          ssh-keyscan -p "${DO_PORT:-22}" -H "$DO_HOST" >> "${HOME}/.ssh/known_hosts"
-      - name: Publish beta without deploying primary
-        env:
-          DO_HOST: ${{ secrets.DO_HOST }}
-          DO_PORT: ${{ secrets.DO_PORT }}
-          DO_USER: ${{ secrets.DO_USER }}
-        run: |
-          set -Eeuo pipefail
-          port="${DO_PORT:-22}"
-          tar -czf /tmp/cloud-beta.tgz --exclude='__pycache__' --exclude='data.json' beta
-          scp -P "$port" -o BatchMode=yes -o IdentitiesOnly=yes /tmp/cloud-beta.tgz "$DO_USER@$DO_HOST:/tmp/cloud-beta-${GITHUB_SHA}.tgz"
-          ssh -p "$port" -o BatchMode=yes -o IdentitiesOnly=yes "$DO_USER@$DO_HOST" "sudo -n bash -s -- ${GITHUB_SHA}" <<'REMOTE'
-          set -Eeuo pipefail
-          revision="$1"
-          [[ "$revision" =~ ^[a-f0-9]{40}$ ]]
-          release="/opt/sb-live-lapse-beta/releases/${revision}"
-          mkdir -p "$release"
-          tar -xzf "/tmp/cloud-beta-${revision}.tgz" -C "$release"
-          bash "${release}/beta/deploy/install.sh" "$revision"
-          rm "/tmp/cloud-beta-${revision}.tgz"
-          REMOTE
-      - name: Verify public beta
-        run: |
-          curl --fail --proto '=https' --max-time 25 https://sb-live-lapse.com/beta/ -o /tmp/beta.html
-          curl --fail --proto '=https' --max-time 25 https://sb-live-lapse.com/beta/data.json -o /tmp/beta.json
-          python3 - <<'PY'
-          import json
-          from pathlib import Path
-          assert 'Clouds &amp;' in Path('/tmp/beta.html').read_text() or 'Clouds & lapse' in Path('/tmp/beta.html').read_text()
-          data = json.loads(Path('/tmp/beta.json').read_text())
-          assert data['version'] == 1 and data['profile']['stations']
-          print('Beta verified; primary deployment was not invoked.')
-          PY
+          bash -n beta/deploy/install.sh beta/deploy/refresh.sh beta/deploy/publish.sh

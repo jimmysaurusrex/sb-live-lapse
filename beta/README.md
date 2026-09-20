@@ -44,10 +44,19 @@ Open http://127.0.0.1:8765/beta/. Generated data is ignored by git.
 
 ## Operations
 
-Push `codex/cloud-beta` to run `.github/workflows/deploy-beta.yml` using the existing
-DigitalOcean SSH secrets. It runs primary and beta tests, uploads only the beta
-directory, generates data before publishing, validates Caddy, and gracefully
-reloads it. It never invokes the primary deployment or primary refresh.
+Push `codex/cloud-beta` to run primary and beta validation in
+`.github/workflows/deploy-beta.yml`. The existing CI account only has permission
+to deploy primary; this beta does not expand its privileges. Publish a tested,
+committed revision using the existing administrator SSH connection:
+
+```sh
+bash beta/deploy/publish.sh root@YOUR_DROPLET /path/to/existing/administrator/key
+```
+
+The publisher uploads only the committed beta directory. The installer generates
+data before publishing, validates Caddy, and gracefully reloads it. It never
+invokes the primary deployment or primary refresh. The SSH key must already be
+unlocked in the local agent, and the host key must already be trusted.
 
 - Code: `/opt/sb-live-lapse-beta/releases/<sha>/beta`, atomic `current` symlink.
 - Web assets: `/srv/sb-live-lapse-beta/releases/<sha>`, atomic `current` symlink.
