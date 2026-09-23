@@ -14,8 +14,18 @@
   <div class="toolbar">
     <button id="metricBtn" class="control-button is-active" type="button">Metric</button>
     <button id="imperialBtn" class="control-button" type="button">Imperial</button>
-    <button id="prevSnapshotBtn" class="control-button" type="button">&#8592;</button>
-    <button id="nextSnapshotBtn" class="control-button" type="button">&#8594;</button>
+    <div class="snapshot-nav" role="group" aria-label="Snapshot navigation (Pacific time)">
+      <button id="prevSnapshotBtn" class="control-button" type="button" aria-label="Previous snapshot">&#8592;</button>
+      <select id="snapshotDay" class="snapshot-field" aria-label="Snapshot day (Pacific time)" disabled>
+        <option value="">---</option>
+      </select>
+      <span aria-hidden="true">@</span>
+      <input id="snapshotTime" class="snapshot-field" type="text" inputmode="numeric" maxlength="5"
+        placeholder="--:--" aria-label="Snapshot time (Pacific, 24-hour)"
+        title="Pacific time: enter HH:MM or HHMM. Press Enter or leave the field to jump to the nearest available snapshot."
+        autocomplete="off" spellcheck="false" disabled />
+      <button id="nextSnapshotBtn" class="control-button" type="button" aria-label="Next snapshot">&#8594;</button>
+    </div>
     <a
       href="../faq.html"
       target="_blank"

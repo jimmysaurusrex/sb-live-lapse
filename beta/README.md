@@ -1,4 +1,4 @@
-# Compact dew-point beta
+# Compact chart beta
 
 Preview: https://sb-live-lapse.com/beta/
 
@@ -19,15 +19,24 @@ points. Source observation times and missing/stale behavior remain those of the
 primary chart. No additional cloud feeds or imagery are fetched.
 
 Primary HTML, CSS, JavaScript, SVGs, data, checkout and refresh job are read-only
-inputs. Beta keeps its own unit preference (`sb_beta_units`). Its HTML and CSS
-match the primary, with a beta page title/canonical URL and a link to the existing
-FAQ. The earlier cloud-context experiment remains available in git history.
+inputs. Beta keeps its own unit preference (`sb_beta_units`), the primary chart
+styles, a beta page title/canonical URL, and a link to the existing FAQ. The earlier
+cloud-context experiment remains available in git history.
+
+The beta time widget keeps the arrows together around a Pacific-day dropdown and
+an editable 24-hour time: `← Weds @ 14:40 →`. The dropdown lists only days with
+available history. Enter `HH:MM` or `HHMM` and press Enter or leave the field to
+jump to the nearest available snapshot on that day; the field then displays the
+snapshot's actual time. Arrow navigation and unit changes keep both fields in
+sync. Escape cancels an edit. Missing history leaves the fields disabled while
+the latest chart remains usable.
 
 ## Local preview and checks
 
 ```sh
 python3 -m unittest discover -s tests -v
 python3 -m unittest discover -s beta/tests -v
+node --test beta/tests/test_controls.cjs
 python3 beta/build_charts.py --primary-dir /path/to/primary-release --output-dir beta/preview
 cp beta/index.html beta/app.js beta/styles.css beta/preview/
 python3 -m http.server 8765 --bind 127.0.0.1
@@ -59,6 +68,5 @@ invoke the primary deployment or grant its CI account new privileges.
 - Caddy: `/etc/caddy/sb-live-lapse-beta.caddy`, imported by the existing Caddyfile.
   Configuration backups are in `/opt/sb-live-lapse-beta/config-backups`.
 
-A full **primary code deployment** regenerates Caddy's configuration and may
-remove the beta import; redeploy beta afterward. Routine primary weather refreshes
-do not change routing or beta files.
+The primary deployment preserves the optional beta route. Routine primary
+weather refreshes do not change routing or beta files.
