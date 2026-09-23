@@ -70,7 +70,7 @@ def add_dew_points(svg, stations, unit):
                                f" ({'KC60YN' if key == 'KC6OYN' else key}) " in prefix), None)
             if station_id is None:
                 raise ValueError("Unrecognized primary station row")
-            replaced, count = re.subn(r" - (?:-?\d+(?:\.\d+)?[CF]|temp missing),",
+            replaced, count = re.subn(r" - (?:-?\d+(?:\.\d+)?[CF](?:/(?:\+\d+(?:\.\d+)?[CF]|saturated|—))?|temp missing|—/—),",
                                      " - " + temperature_pair(rows[station_id], unit) + ",", prefix, count=1)
             if count != 1:
                 raise ValueError("Unrecognized primary temperature label")

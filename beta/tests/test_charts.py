@@ -76,6 +76,18 @@ class DewPointChartsTests(unittest.TestCase):
             self.assertEqual(self.graph_labels(result)["AntFarm"], "86.3F/—")
             self.assertIn(" - 86.3F/—,", result)
 
+    def test_already_promoted_primary_labels_are_idempotent(self):
+        temperature = self.stations["SE234"]["temp_c"]
+        for unit, source in zip(("metric", "imperial"), self.svgs):
+            self.stations["SE234"]["temp_c"] = temperature
+            for dew in (12, self.stations["SE234"]["temp_c"], None):
+                self.stations["SE234"]["dew_c"] = dew
+                first = add_dew_points(source, self.stations, unit)
+                self.assertEqual(add_dew_points(first, self.stations, unit), first)
+            self.stations["SE234"]["temp_c"] = None
+            missing = add_dew_points(source, self.stations, unit)
+            self.assertEqual(add_dew_points(missing, self.stations, unit), missing)
+
     def test_longer_label_and_its_lapse_value_flip_together_at_right_edge(self):
         root = ET.fromstring(self.svgs[1])
         elements = list(root)
