@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Add T/Td labels to read-only primary SVGs, preserving their chart geometry."""
+"""Add temperature/dew-point-spread labels to read-only primary SVGs."""
 import argparse
 import json
 import math
@@ -24,13 +24,18 @@ def temperature_pair(row, unit):
     temperature, dew = value(row.get("temp_c")), value(row.get("dew_c"))
     if temperature is not None and dew is not None and dew > temperature:
         dew = None
-    def formatted(number):
-        if number is None:
-            return "—"
-        if unit == "imperial":
-            number = number * 9 / 5 + 32
-        return f"{number:.1f}{'F' if unit == 'imperial' else 'C'}"
-    return f"{formatted(temperature)}/{formatted(dew)}"
+    if temperature is None:
+        return "—/—"
+    suffix = "F" if unit == "imperial" else "C"
+    displayed_temperature = temperature * 9 / 5 + 32 if unit == "imperial" else temperature
+    spread_text = "—"
+    if dew is not None:
+        # Convert the difference, without the 32-degree temperature offset.
+        spread = (temperature - dew) * (9 / 5 if unit == "imperial" else 1)
+        rounded = f"{spread:.1f}"
+        # Saturated at the chart's displayed precision; never show +0.0.
+        spread_text = "saturated" if rounded == "0.0" else f"+{rounded}{suffix}"
+    return f"{displayed_temperature:.1f}{suffix}/{spread_text}"
 
 
 def add_dew_points(svg, stations, unit):
@@ -71,7 +76,7 @@ def add_dew_points(svg, stations, unit):
                 raise ValueError("Unrecognized primary temperature label")
             prefix_node.text = replaced
         elif kind == "legend-h" and element.text == "Stations":
-            element.text = "Stations (temperature/dew point)"
+            element.text = "Stations (temperature/dew-point spread)"
     return ET.tostring(root, encoding="unicode")
 
 

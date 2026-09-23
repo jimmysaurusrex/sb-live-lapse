@@ -4,11 +4,15 @@ Preview: https://sb-live-lapse.com/beta/
 
 This beta keeps the primary site's compact layout, SVG chart, wind barbs, lapse
 rates, station rows, metric/imperial controls, and snapshot navigation. The change
-is a temperature/dew-point pair at each station, both on the graph and in the
-station list: `86.3F/53.9F` or `30.2C/12.2C`. Missing dew point is `86.3F/—`.
+is a temperature/dew-point-spread pair at each station, both on the graph and in
+the station list: `63.5F/+1.3F` means a dew point of `62.2F`. The spread uses a
+leading plus sign, one decimal place, and a leading zero below one degree
+(`+0.5F`). A spread that rounds to zero in the selected units is shown as
+`/saturated`. Missing dew point is `63.5F/—`. Celsius works the same way; Fahrenheit
+spreads are converted as differences, without adding 32.
 
-`build_charts.py` reads an existing primary release and adds dew points to its SVG
-text labels. The primary chart's colors, dimensions, axes, geometry and weather
+`build_charts.py` reads an existing primary release and adds dew-point spreads to
+its SVG text labels. The primary chart's colors, dimensions, axes, geometry and weather
 calculations are preserved. Labels near the right edge can flip left using the
 original chart's sizing rule. Each historical chart uses its own snapshot's dew
 points. Source observation times and missing/stale behavior remain those of the

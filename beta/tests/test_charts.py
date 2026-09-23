@@ -38,8 +38,8 @@ class DewPointChartsTests(unittest.TestCase):
             original = self.svgs[index]
             result = add_dew_points(original, self.stations, unit)
             labels = self.graph_labels(result)
-            self.assertEqual(labels["AntFarm"], "86.3F/53.9F" if unit == "imperial" else "30.2C/12.2C")
-            self.assertEqual(labels["VOR"], "86.3F/32.0F" if unit == "imperial" else "30.2C/0.0C")
+            self.assertEqual(labels["AntFarm"], "86.3F/+32.4F" if unit == "imperial" else "30.2C/+18.0C")
+            self.assertEqual(labels["VOR"], "86.3F/+54.3F" if unit == "imperial" else "30.2C/+30.2C")
             rows = ["".join(node.itertext()) for node in ET.fromstring(result).findall(SVG + "text")
                     if node.get("class") == "legend-row"]
             for row in rows:
@@ -50,6 +50,24 @@ class DewPointChartsTests(unittest.TestCase):
                 return [(node.tag, node.attrib) for node in root if node.tag != SVG + "text"]
             self.assertEqual(geometry(original), geometry(result))
         self.assertEqual(self.stations, original_stations)
+
+    def test_spread_examples_leading_zero_and_saturation_on_graph_and_table(self):
+        cases = [
+            ("imperial", (63.5 - 32) * 5 / 9, (62.2 - 32) * 5 / 9, "63.5F/+1.3F"),
+            ("imperial", (63.5 - 32) * 5 / 9, (63.0 - 32) * 5 / 9, "63.5F/+0.5F"),
+            ("imperial", 17.5, 17.5, "63.5F/saturated"),
+            ("metric", -5, -5.5, "-5.0C/+0.5C"),
+            ("metric", 0, 0, "0.0C/saturated"),
+            ("metric", 10, 9.96, "10.0C/saturated"),
+            ("imperial", 10, 9.96, "50.0F/+0.1F"),
+        ]
+        for unit, temperature, dew, expected in cases:
+            with self.subTest(unit=unit, temperature=temperature, dew=dew):
+                self.stations["SE234"].update(temp_c=temperature, dew_c=dew)
+                source = primary_chart.build_snapshot_svgs(self.snapshot)[unit == "imperial"]
+                result = add_dew_points(source, self.stations, unit)
+                self.assertEqual(self.graph_labels(result)["AntFarm"], expected)
+                self.assertIn(f" - {expected},", result)
 
     def test_missing_and_invalid_dew_points_stay_missing_without_losing_temperature(self):
         for bad_dew in (None, float("nan"), float("inf"), "12", 99, 40):
@@ -90,7 +108,7 @@ class DewPointChartsTests(unittest.TestCase):
             result = build(primary, output)
             self.assertEqual(result["snapshots"], 1)
             for path in [output / "sba_wwtemp_chart_imperial.svg", output / self.snapshot["charts"]["imperial_svg"]]:
-                self.assertIn("86.3F/53.9F", path.read_text())
+                self.assertIn("86.3F/+32.4F", path.read_text())
             self.assertEqual(json.loads((output / "station_history.json").read_text())["snapshots"][0]["charts"], self.snapshot["charts"])
             self.assertEqual(before, {str(path): path.read_bytes() for path in primary.rglob("*") if path.is_file()})
             with self.assertRaises(ValueError):
