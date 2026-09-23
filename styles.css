@@ -31,6 +31,30 @@ body {
   opacity: 0.45;
 }
 
+.snapshot-nav {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  white-space: nowrap;
+  font-size: 13px;
+}
+
+.snapshot-field {
+  box-sizing: border-box;
+  height: 29px;
+  padding: 4px 5px;
+  border: 1px solid #888;
+  border-radius: 4px;
+  background: #fff;
+  color: #222;
+  font: 13px Helvetica, Arial, sans-serif;
+}
+
+#snapshotDay { width: 65px; }
+#snapshotTime { width: 58px; text-align: center; font-variant-numeric: tabular-nums; }
+.snapshot-field:disabled { opacity: 0.45; }
+.snapshot-field[aria-invalid="true"] { border-color: #c62828; }
+
 .toolbar-link {
   color: #0000ee;
   font-size: 14px;

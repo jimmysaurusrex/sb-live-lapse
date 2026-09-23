@@ -26,8 +26,10 @@
   var imperialBtn = document.getElementById("imperialBtn");
   var prevBtn = document.getElementById("prevSnapshotBtn");
   var nextBtn = document.getElementById("nextSnapshotBtn");
+  var daySelect = document.getElementById("snapshotDay");
+  var timeInput = document.getElementById("snapshotTime");
 
-  if (!img || !title || !metricBtn || !imperialBtn || !prevBtn || !nextBtn) return;
+  if (!img || !title || !metricBtn || !imperialBtn || !prevBtn || !nextBtn || !daySelect || !timeInput) return;
 
   var storageKey = "sb_units";
   var snapshotPathRe = /^snapshots\/\d{8}T\d{4}Z_(metric|imperial)\.svg$/;
@@ -41,27 +43,35 @@
     index: -1
   };
   var fetchedLatestTitle = false;
+  var pacificFormat = new Intl.DateTimeFormat("en-US", {
+    weekday: "short",
+    year: "numeric",
+    month: "numeric",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
+    timeZone: "America/Los_Angeles"
+  });
 
-  function formatPacificRefreshLabel(isoTime) {
+  function pacificParts(isoTime) {
     if (!isoTime) return null;
     var dt = new Date(isoTime);
     if (isNaN(dt.getTime())) return null;
-    var parts = new Intl.DateTimeFormat("en-US", {
-      weekday: "short",
-      month: "numeric",
-      day: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-      hour12: false,
-      timeZone: "America/Los_Angeles"
-    }).formatToParts(dt);
+    var parts = pacificFormat.formatToParts(dt);
     var values = {};
     parts.forEach(function (part) {
       if (part.type !== "literal") values[part.type] = part.value;
     });
-    if (!values.weekday || !values.month || !values.day || !values.hour || !values.minute) {
-      return null;
-    }
+    values.date = values.year + "-" + values.month.padStart(2, "0") + "-" + values.day.padStart(2, "0");
+    values.time = values.hour + ":" + values.minute;
+    values.minutes = Number(values.hour) * 60 + Number(values.minute);
+    return values;
+  }
+
+  function formatPacificRefreshLabel(isoTime) {
+    var values = pacificParts(isoTime);
+    if (!values) return null;
     return values.weekday + " " + values.month + "/" + values.day + " at " + values.hour + ":" + values.minute;
   }
 
@@ -87,6 +97,74 @@
     var hasSnapshots = state.snapshots.length > 0;
     setNavButtonDisabled(prevBtn, !hasSnapshots || state.index <= 0);
     setNavButtonDisabled(nextBtn, !hasSnapshots || state.index >= state.snapshots.length - 1);
+    daySelect.disabled = !hasSnapshots;
+    timeInput.disabled = !hasSnapshots;
+  }
+
+  function clearTimeError() {
+    timeInput.setCustomValidity("");
+    timeInput.removeAttribute("aria-invalid");
+  }
+
+  function updateSnapshotFields() {
+    var snapshot = currentSnapshot();
+    if (!snapshot) return;
+    daySelect.value = snapshot.local.date;
+    daySelect.title = snapshot.local.weekday + " " + snapshot.local.month + "/" + snapshot.local.day + " (Pacific time)";
+    timeInput.value = snapshot.local.time;
+    clearTimeError();
+  }
+
+  function populateDays() {
+    if (!state.snapshots.length) return;
+    daySelect.replaceChildren();
+    var seen = {};
+    var weekdays = { Tue: "Tues", Wed: "Weds", Thu: "Thurs" };
+    state.snapshots.slice().reverse().forEach(function (snapshot) {
+      var local = snapshot.local;
+      if (seen[local.date]) return;
+      seen[local.date] = true;
+      var option = document.createElement("option");
+      option.value = local.date;
+      option.textContent = weekdays[local.weekday] || local.weekday;
+      option.title = local.month + "/" + local.day + "/" + local.year;
+      daySelect.appendChild(option);
+    });
+  }
+
+  function jumpToTime(reportError) {
+    var raw = timeInput.value.trim();
+    var match = /^(\d{1,2}):(\d{2})$/.exec(raw) || /^(\d{1,2})(\d{2})$/.exec(raw);
+    if (!match || Number(match[1]) > 23 || Number(match[2]) > 59) {
+      if (reportError) {
+        timeInput.setCustomValidity("Enter a 24-hour time from 00:00 to 23:59.");
+        timeInput.setAttribute("aria-invalid", "true");
+        timeInput.reportValidity();
+      } else {
+        updateSnapshotFields();
+      }
+      return;
+    }
+    var minutes = Number(match[1]) * 60 + Number(match[2]);
+    var nearest = -1;
+    var distance = Infinity;
+    state.snapshots.forEach(function (snapshot, index) {
+      if (snapshot.local.date !== daySelect.value) return;
+      var gap = Math.abs(snapshot.local.minutes - minutes);
+      // Keep the closest chronological occurrence when clocks repeat at DST.
+      if (gap < distance || (gap === distance && Math.abs(index - state.index) < Math.abs(nearest - state.index))) {
+        nearest = index;
+        distance = gap;
+      }
+    });
+    if (nearest !== -1) {
+      if (nearest === state.index) {
+        updateSnapshotFields();
+        return;
+      }
+      state.index = nearest;
+      render();
+    }
   }
 
   function currentSnapshot() {
@@ -116,7 +194,7 @@
     fetch("./station_state.json?v=" + slot, { cache: "no-store" })
       .then(function (resp) { return resp.ok ? resp.json() : null; })
       .then(function (latestState) {
-        if (!latestState || !latestState.generated_at) return;
+        if (!latestState || !latestState.generated_at || currentSnapshot()) return;
         setTitleForIso(latestState.generated_at);
       })
       .catch(function () {});
@@ -125,6 +203,7 @@
   function render() {
     updateUnitButtons();
     updateNavButtons();
+    updateSnapshotFields();
     var snapshot = currentSnapshot();
     img.src = sourceForSnapshot(snapshot, state.unit);
     if (!snapshot || !setTitleForIso(snapshot.run_at)) {
@@ -152,6 +231,19 @@
       render();
     }
   });
+  daySelect.addEventListener("change", function () { jumpToTime(false); });
+  timeInput.addEventListener("input", clearTimeError);
+  timeInput.addEventListener("blur", function () { jumpToTime(false); });
+  timeInput.addEventListener("keydown", function (event) {
+    if (event.key === "Enter") {
+      event.preventDefault();
+      jumpToTime(true);
+    } else if (event.key === "Escape") {
+      event.preventDefault();
+      updateSnapshotFields();
+      timeInput.blur();
+    }
+  });
 
   try {
     var raw = localStorage.getItem(storageKey);
@@ -168,6 +260,7 @@
           return !!(
             snap &&
             typeof snap.run_at === "string" &&
+            !isNaN(Date.parse(snap.run_at)) &&
             snap.charts &&
             isChartPath(snap.charts.metric_svg, "metric") &&
             isChartPath(snap.charts.imperial_svg, "imperial")
@@ -175,10 +268,14 @@
         });
       }
       snapshots.sort(function (a, b) {
-        return a.run_at < b.run_at ? -1 : (a.run_at > b.run_at ? 1 : 0);
+        return Date.parse(a.run_at) - Date.parse(b.run_at);
+      });
+      snapshots = snapshots.map(function (snapshot) {
+        return { run_at: snapshot.run_at, charts: snapshot.charts, local: pacificParts(snapshot.run_at) };
       });
       state.snapshots = snapshots;
       state.index = snapshots.length ? snapshots.length - 1 : -1;
+      populateDays();
       render();
     })
     .catch(function () {});

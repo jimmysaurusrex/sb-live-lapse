@@ -27,6 +27,9 @@ jobs:
       - name: Test station feed handling
         run: python3 -m unittest discover -s tests -v
 
+      - name: Test chart time controls
+        run: node --test tests/test_controls.cjs
+
       - name: Build chart (with retry)
         run: |
           set -Eeuo pipefail
