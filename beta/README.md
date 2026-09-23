@@ -1,78 +1,60 @@
-# Cloud beta
+# Compact dew-point beta
 
-Public preview: https://sb-live-lapse.com/beta/
+Preview: https://sb-live-lapse.com/beta/
 
-The beta runs independently of the primary site. Only `beta/` and its dedicated
-deployment workflow are added on `codex/cloud-beta`; the primary checkout, assets,
-data writer, deployment workflow and refresh timer are unchanged.
+This beta keeps the primary site's compact layout, SVG chart, wind barbs, lapse
+rates, station rows, metric/imperial controls, and snapshot navigation. The change
+is a temperature/dew-point pair at each station, both on the graph and in the
+station list: `86.3F/53.9F` or `30.2C/12.2C`. Missing dew point is `86.3F/—`.
 
-## Data and interpretation
+`build_charts.py` reads an existing primary release and adds dew points to its SVG
+text labels. The primary chart's colors, dimensions, axes, geometry and weather
+calculations are preserved. Labels near the right edge can flip left using the
+original chart's sizing rule. Each historical chart uses its own snapshot's dew
+points. Source observation times and missing/stale behavior remain those of the
+primary chart. No additional cloud feeds or imagery are fetched.
 
-- The station/RASS profile is a read-only snapshot of primary `station_history.json`.
-  Temperature/dew-point spread is a moisture hint, not cloud detection. Fields may
-  have different observation times in the upstream station data. Cached and
-  temperature observations older than 60 minutes are excluded from saturation
-  flags and the VOR LCL estimate. Invalid dew points above temperature are omitted.
-- KSBA METAR cloud bases are feet AGL, converted to meters MSL using the report's
-  airport elevation. Coverage and base are plotted; tops are not inferred. Missing,
-  clear, obscured and stale reports are distinct. Reports expire at 90 minutes.
-- VOR LCL uses station elevation + 125 m per °C of temperature/dew-point spread.
-  It estimates lifted-parcel condensation, not existing cloud.
-- NOAA/CIRA GOES-West GeoColor provides regional cloud context. Dated images expire
-  at 60 minutes; their time comes from the filename, not fetch time.
-- ALERTCalifornia camera 1986 is Gibraltar 2, at 34.465286, -119.678314, approximately
-  0.67 km south of AntFarm (34.47121, -119.67688). The public camera's linked location
-  and image timestamp come from its public metadata. Images expire at 15 minutes;
-  offline cameras are hidden. Camera heading changes as the camera rotates.
-  Credit: ALERTCalifornia | UC San Diego. Public imagery policy:
-  https://alertcalifornia.org/images-and-video/
+Primary HTML, CSS, JavaScript, SVGs, data, checkout and refresh job are read-only
+inputs. Beta keeps its own unit preference (`sb_beta_units`). Its HTML and CSS
+match the primary, with a beta page title/canonical URL and a link to the existing
+FAQ. The earlier cloud-context experiment remains available in git history.
 
-Source failures retain original observation times. Each source fails independently.
-The browser enforces freshness even if the whole beta refresh stops. The beta uses
-its own local-storage setting and restricts image URLs to the selected public feeds.
-
-## Development
+## Local preview and checks
 
 ```sh
+python3 -m unittest discover -s tests -v
 python3 -m unittest discover -s beta/tests -v
-node --test beta/tests/model.test.mjs
-python3 beta/build_data.py --output beta/data.json
+python3 beta/build_charts.py --primary-dir /path/to/primary-release --output-dir beta/preview
+cp beta/index.html beta/app.js beta/styles.css beta/preview/
 python3 -m http.server 8765 --bind 127.0.0.1
 ```
 
-Open http://127.0.0.1:8765/beta/. Generated data is ignored by git.
+Open http://127.0.0.1:8765/beta/preview/. Generated files are ignored by git.
 
-## Operations
+## Publishing and operations
 
-Push `codex/cloud-beta` to run primary and beta validation in
-`.github/workflows/deploy-beta.yml`. The existing CI account only has permission
-to deploy primary; this beta does not expand its privileges. Publish a tested,
-committed revision using the existing administrator SSH connection:
+Push `codex/cloud-beta` to run validation in `.github/workflows/deploy-beta.yml`.
+Publish the tested, committed beta with the existing administrator connection:
 
 ```sh
 bash beta/deploy/publish.sh root@YOUR_DROPLET /path/to/existing/administrator/key
 ```
 
-The publisher uploads only the committed beta directory. The installer generates
-data before publishing, validates Caddy, and gracefully reloads it. It never
-invokes the primary deployment or primary refresh. The SSH key must already be
-unlocked in the local agent, and the host key must already be trusted.
+The publisher uploads only committed beta code. The installer builds the SVGs
+before exposing them, validates Caddy, and gracefully reloads it. It checks primary
+asset hashes and that the primary refresh timer is still active. It does not
+invoke the primary deployment or grant its CI account new privileges.
 
 - Code: `/opt/sb-live-lapse-beta/releases/<sha>/beta`, atomic `current` symlink.
 - Web assets: `/srv/sb-live-lapse-beta/releases/<sha>`, atomic `current` symlink.
-- Data: `/srv/sb-live-lapse-beta/data.json`, atomically replaced every five minutes.
-- Timer/service: `sb-live-lapse-beta.timer` / `sb-live-lapse-beta.service`.
-  The service can only write to `/srv/sb-live-lapse-beta`.
+- Generated charts/history: `/srv/sb-live-lapse-beta/chart-data`, linked from the
+  beta web release. Individual files are written atomically; unchanged files are
+  retained. Only beta snapshot files outside the primary history are pruned.
+- Timer/service: `sb-live-lapse-beta.timer` / `sb-live-lapse-beta.service`, every
+  five minutes. The service can only write to `/srv/sb-live-lapse-beta`.
 - Caddy: `/etc/caddy/sb-live-lapse-beta.caddy`, imported by the existing Caddyfile.
-  The installer verifies primary asset hashes and that its timer stays active.
-  Backups of Caddy configuration are in `/opt/sb-live-lapse-beta/config-backups`.
+  Configuration backups are in `/opt/sb-live-lapse-beta/config-backups`.
 
-The sole shared-server change is the `/beta` route and a graceful Caddy reload.
-A future full **primary deployment** regenerates Caddy's main configuration and
-may remove that import; redeploy this beta afterward. Routine primary refreshes
-do not change routing or beta files. If the beta is promoted later, preserve its
-route explicitly in the primary deployment template at that time.
-
-To disable the preview, stop/disable `sb-live-lapse-beta.timer`, remove its single
-import from `/etc/caddy/Caddyfile`, validate Caddy and reload it. Do not restore an
-old full configuration if other server configuration has since changed.
+A full **primary code deployment** regenerates Caddy's configuration and may
+remove the beta import; redeploy beta afterward. Routine primary weather refreshes
+do not change routing or beta files.

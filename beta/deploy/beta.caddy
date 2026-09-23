@@ -2,6 +2,7 @@ redir /beta /beta/ 308
 handle_path /beta/* {
     root * /srv/sb-live-lapse-beta/current
     header Cache-Control "no-store"
-    header Content-Security-Policy "default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; form-action 'none'; script-src 'self'; style-src 'self'; img-src 'self' https://cdn.star.nesdis.noaa.gov https://img.cdn.prod.alertwest.com; connect-src 'self'; upgrade-insecure-requests"
+    @beta_html path / /index.html
+    header @beta_html Content-Security-Policy "default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; form-action 'none'; script-src 'self'; style-src 'self'; img-src 'self'; connect-src 'self'; upgrade-insecure-requests"
     file_server
 }

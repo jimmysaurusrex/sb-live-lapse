@@ -22,18 +22,20 @@ install -d -o sb-live-lapse -g sb-live-lapse "${beta_root}" "${beta_root}/releas
 install -d "${code_root}"
 stage="${beta_root}/releases/${revision}"
 install -d -o sb-live-lapse -g sb-live-lapse "$stage"
-for asset in index.html styles.css app.mjs model.mjs; do
+for asset in index.html styles.css app.js; do
     install -m 0644 "${source_dir}/${asset}" "${stage}/${asset}"
 done
-ln -sfn ../../data.json "${stage}/data.json"
+for artifact in station_state.json station_history.json sba_wwtemp_chart.svg sba_wwtemp_chart_metric.svg sba_wwtemp_chart_imperial.svg snapshots; do
+    ln -sfn "../../chart-data/${artifact}" "${stage}/${artifact}"
+done
 
 # Generate beta data before exposing the route. A failure cannot affect primary publishing.
-sudo -u sb-live-lapse python3 "${source_dir}/build_data.py" \
-    --primary-dir "$primary_root" --output "${beta_root}/data.json"
-python3 - "${beta_root}/data.json" <<'PY'
+sudo -u sb-live-lapse python3 "${source_dir}/build_charts.py" \
+    --primary-dir "$primary_root" --output-dir "${beta_root}/chart-data"
+python3 - "${beta_root}/chart-data/station_state.json" <<'PY'
 import json, sys
 data = json.load(open(sys.argv[1]))
-assert data.get('version') == 1 and data.get('profile', {}).get('stations'), 'Beta profile missing'
+assert data.get('stations'), 'Beta profile missing'
 PY
 
 # Validate a candidate config first. Apart from one /beta-only import, the

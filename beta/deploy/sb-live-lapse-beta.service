@@ -1,5 +1,5 @@
 [Unit]
-Description=Refresh isolated SB cloud beta observations
+Description=Refresh isolated SB dew-point beta charts
 Wants=network-online.target
 After=network-online.target
 

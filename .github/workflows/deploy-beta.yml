@@ -1,4 +1,4 @@
-name: Validate Isolated Cloud Beta
+name: Validate Isolated Dew Point Beta
 on:
   push:
     branches: [codex/cloud-beta]
@@ -7,7 +7,7 @@ on:
 permissions:
   contents: read
 concurrency:
-  group: cloud-beta-validation
+  group: dew-point-beta-validation
   cancel-in-progress: false
 jobs:
   validate-beta:
@@ -18,12 +18,8 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '22'
       - name: Test primary and beta
         run: |
           python3 -m unittest discover -s tests -v
           python3 -m unittest discover -s beta/tests -v
-          node --test beta/tests/model.test.mjs
           bash -n beta/deploy/install.sh beta/deploy/refresh.sh beta/deploy/publish.sh
