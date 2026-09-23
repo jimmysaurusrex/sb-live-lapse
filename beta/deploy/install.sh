@@ -51,7 +51,9 @@ from pathlib import Path
 import sys
 original = Path(sys.argv[1]).read_text()
 marker = '    import /etc/caddy/sb-live-lapse-beta.caddy\n'
-if marker in original:
+if any(line.strip() in ('import /etc/caddy/sb-live-lapse-beta.caddy',
+                        'import /etc/caddy/sb-live-lapse-beta*.caddy')
+       for line in original.splitlines()):
     candidate = original
 else:
     anchor = '\tfile_server\n'
