@@ -22,5 +22,7 @@ __SITE_ADDRESS__ {
 		Cross-Origin-Resource-Policy "same-origin"
 	}
 
+	# Optional route managed by the separate beta deployment.
+	import /etc/caddy/sb-live-lapse-beta*.caddy
 	file_server
 }

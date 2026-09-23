@@ -43,7 +43,8 @@ output_path.write_text(text)
 PY
 
 systemctl daemon-reload
+caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile
 systemctl enable --now caddy
-systemctl restart caddy
+systemctl reload caddy
 systemctl enable --now sb-live-lapse-refresh.timer
 systemctl start sb-live-lapse-refresh.service

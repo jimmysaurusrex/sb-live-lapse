@@ -57,6 +57,7 @@ STATE_PATH = Path("station_state.json")
 HISTORY_PATH = Path("station_history.json")
 SNAPSHOT_DIR = Path("snapshots")
 SNAPSHOT_CHART_RE = re.compile(r"^snapshots/\d{8}T\d{4}Z_(metric|imperial)\.svg$")
+CHART_RENDER_VERSION = 2
 
 MS_TO_MPH = 2.23694
 FT_PER_M = 3.28084
@@ -1208,6 +1209,7 @@ def write_station_history(
             "charts": {
                 "metric_svg": metric_rel,
                 "imperial_svg": imperial_rel,
+                "render_version": CHART_RENDER_VERSION,
             },
             "rass": {
                 "file": rass_filename,
@@ -1227,7 +1229,7 @@ def write_station_history(
         imperial_existing = charts.get("imperial_svg") if isinstance(charts, dict) else None
         metric_ok = is_snapshot_chart_path(metric_existing) and Path(metric_existing).exists()
         imperial_ok = is_snapshot_chart_path(imperial_existing) and Path(imperial_existing).exists()
-        if metric_ok and imperial_ok:
+        if metric_ok and imperial_ok and charts.get("render_version") == CHART_RENDER_VERSION:
             valid_history.append(snapshot)
             continue
         rebuilt = build_snapshot_svgs(snapshot)
@@ -1237,6 +1239,7 @@ def write_station_history(
         snapshot["charts"] = {
             "metric_svg": metric_rel_built,
             "imperial_svg": imperial_rel_built,
+            "render_version": CHART_RENDER_VERSION,
         }
         valid_history.append(snapshot)
     history = valid_history
@@ -1269,6 +1272,7 @@ def convert_station_rows_units(rows: List[Dict], unit_system: str) -> List[Dict]
     out: List[Dict] = []
     for row in rows:
         converted = dict(row)
+        converted["temperature_text"] = station_temperature_text(row, "F" if unit_system == "imperial" else "C")
         if unit_system == "imperial":
             if converted.get("elev_m") is not None:
                 converted["elev_m"] = m_to_ft(converted["elev_m"])
@@ -1278,6 +1282,26 @@ def convert_station_rows_units(rows: List[Dict], unit_system: str) -> List[Dict]
                 converted["dew_c"] = c_to_f(converted["dew_c"])
         out.append(converted)
     return out
+
+
+def station_temperature_text(row: Dict, temp_suffix: str) -> str:
+    """Format a Celsius source row in the requested display unit."""
+    def valid(value: object) -> bool:
+        return (isinstance(value, (int, float)) and not isinstance(value, bool)
+                and math.isfinite(value) and -100 <= value <= 60)
+
+    temperature, dew = row.get("temp_c"), row.get("dew_c")
+    if not valid(temperature):
+        return "—/—"
+    displayed_temperature = c_to_f(temperature) if temp_suffix == "F" else temperature
+    spread_text = "—"
+    if valid(dew) and dew <= temperature:
+        # Convert the difference without a Fahrenheit offset, as in beta.
+        # Saturation uses the chart's one-decimal precision.
+        spread = (temperature - dew) * (9 / 5 if temp_suffix == "F" else 1)
+        rounded = f"{spread:.1f}"
+        spread_text = "saturated" if rounded == "0.0" else f"+{rounded}{temp_suffix}"
+    return f"{displayed_temperature:.1f}{temp_suffix}/{spread_text}"
 
 
 def utc_iso_to_local_hhmm(iso_time: Optional[str]) -> Optional[str]:
@@ -1697,11 +1721,14 @@ def draw_svg(
         label_y = max(margin_top + 10, min(height - margin_bottom - 16, label_y))
         placed_ys.append(label_y)
 
-        temp_text = "%.1f%s" % (row["temp_c"], temp_suffix)
+        temp_text = row["temperature_text"]
         station_name_text = str(row["name"])
         label = "%s %s" % (station_name_text, temp_text)
         est_w = 6 * len(label)
-        if x_px + est_w + 8 > width - margin_right:
+        original_label = "%s %.1f%s" % (station_name_text, row["temp_c"], temp_suffix)
+        # Keep existing left-facing labels; let extended labels use the right
+        # margin before flipping, matching the compact beta charts.
+        if x_px + 6 * len(original_label) + 8 > width - margin_right or x_px + est_w + 8 > width - 12:
             lines.append(
                 '<text class="station-label" x="%.2f" y="%.2f" text-anchor="end"><tspan>%s</tspan><tspan fill="#111111"> %s</tspan></text>'
                 % (x_px - 6, label_y + 4, svg_text(station_name_text), svg_text(temp_text))
@@ -1752,14 +1779,12 @@ def draw_svg(
     lines.append('<text class="label" x="%d" y="%d">Station Lapse Line</text>' % (station_line_x + 30, legend_y + 4))
 
     list_y0 = legend_y + 34
-    lines.append('<text class="legend-h" x="%d" y="%d">Stations</text>' % (legend_x, list_y0))
+    lines.append('<text class="legend-h" x="%d" y="%d">Stations (temperature/dew-point spread)</text>' % (legend_x, list_y0))
     lapse_info_by_station = station_lapse_rate_data(stations_all, temp_suffix, altitude_unit)
 
     row_y = list_y0 + 16
     for row in stations_all:
-        temp_text = "temp missing"
-        if row.get("temp_c") is not None:
-            temp_text = "%.1f%s" % (row["temp_c"], temp_suffix)
+        temp_text = row["temperature_text"]
         elev_text = "elev-missing"
         if row.get("elev_m") is not None:
             elev_text = "%d%s" % (int(round(row["elev_m"])), altitude_unit)
