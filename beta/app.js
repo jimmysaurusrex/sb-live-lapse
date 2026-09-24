@@ -60,8 +60,8 @@ function createSatelliteLoader(chart, dataReady) {
     button.disabled = !coreReady() || !!active;
     loopButton.hidden = !finished || !manifest || !manifest.loop;
     loopButton.disabled = !coreReady() || !!active;
-    loopButton.textContent = playing ? "Stop loop" : "Play last hour (" +
-      (manifest ? Math.ceil(manifest.loop_bytes / 1024) : "") + " KB)";
+    loopButton.textContent = playing ? "Stop loop" : "Play last hour";
+    loopButton.title = manifest && manifest.loop ? "Download: " + Math.ceil(manifest.loop_bytes / 1024) + " KB" : "";
     if (!finished && !active && !failed) {
       status.textContent = !requested && conserveData() ? "Satellite image paused to save data. Tap to load." : waitingText;
     }
@@ -107,7 +107,7 @@ function createSatelliteLoader(chart, dataReady) {
       failed = true;
       requested = false;
       image.hidden = true;
-      status.textContent = "Satellite image unavailable. Retry or open CIRA/NOAA above.";
+      status.textContent = "Satellite image unavailable. Tap Retry to try again.";
       button.textContent = "Retry satellite image";
     }
     schedule();

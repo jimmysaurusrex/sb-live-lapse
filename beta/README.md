@@ -39,15 +39,18 @@ CIRA/NOAA GOES-West full-disk tiles provide native Band 2 visible imagery by day
 footprints are larger. CIRA's grid navigation is used to reproject the small crop
 with nearest-neighbor sampling; enlarging pixels does not create extra detail.
 The visible image uses fixed gamma enhancement. Solar elevation at the image
-scan time selects the product; twilight is labeled. Neither view measures cloud
+scan time selects the product; twilight is included in the accessible description. Neither view measures cloud
 base or sees low cloud hidden under an opaque upper layer.
 
-Scans are ten minutes apart, with additional publication latency. The page shows
-the actual scan start time in Pacific time, its age (updated without network
-traffic), and a delayed label after 30 minutes. Imagery is independent of the
-selected historical weather chart. A compact still is the default (~45 KB in the
+Scans are ten minutes apart, with additional publication latency. The visible
+section contains only its heading, a date/time line above each image frame, the
+map, and the Play/Stop button. The actual scan start time is Pacific time and
+changes with each animation frame. Image age, delay and twilight details remain
+in a hidden accessible description, updated without network traffic. Source
+attribution is in the image tooltip. Imagery is independent of the selected
+historical weather chart. A compact still is the default (~45 KB in the
 first real preview); a last-hour GIF loop (~315 KB in that preview, scene-dependent)
-is downloaded only after tapping Play, whose label includes its size. Stop,
+is downloaded only after tapping Play, whose tooltip includes its size. Stop,
 chart navigation or hiding the tab returns to the still. The loop download is
 retained for replay. There are no background image downloads or automatic refreshes.
 
@@ -64,7 +67,7 @@ resource-limited beta satellite service, never in a visitor's browser.
 `build_satellite.py` publishes dated JPEGs and an optional GIF before atomically
 replacing `latest.json`. It reuses existing frames, tolerates a not-yet-published
 newest tile, never replaces a good image with an older one, and retains the last
-good output on upstream failure. The frontend's age label then exposes the delay.
+good output on upstream failure. The displayed scan time remains unchanged; its accessible description also flags the delay.
 Only generated satellite artifacts older than 24 hours are pruned. Attribution
 and projection details are recorded in `data/README.md`.
 

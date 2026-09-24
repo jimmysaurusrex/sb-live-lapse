@@ -17,11 +17,11 @@ BASE = "https://slider.cira.colostate.edu/data"
 PRODUCTS = {"visible": ("band_02", 5), "night": ("eumetsat_nighttime_microphysics", 3)}
 # Painted Cave to Rincon, plus about 4–6 km around the requested box.
 WEST, SOUTH, EAST, NORTH = -119.85, 34.32, -119.42, 34.55
-WIDTH, MAP_HEIGHT, TOP, HEIGHT = 600, 390, 28, 466
+WIDTH, MAP_HEIGHT, TOP, HEIGHT = 600, 390, 28, 418
 TILE_SIZE = 678
 PACIFIC = ZoneInfo("America/Los_Angeles")
 COASTLINE = Path(__file__).with_name("data") / "coastline.json"
-RENDER_VERSION = 1
+RENDER_VERSION = 2
 
 
 def parse_stamp(stamp):
@@ -161,13 +161,8 @@ def render_frame(stamp, mode, tiles, pixels):
     draw.line([(18, y), (18 + scale, y)], fill=gold, width=2)
     draw.text((18, y - 23), "5 km", font=font(16), fill=gold, stroke_width=1, stroke_fill="black")
     moment = parse_stamp(stamp)
-    label = "Visible" if mode == "visible" else "Night low clouds"
     clock = moment.astimezone(PACIFIC).strftime("%b %d %H:%M %Z")
-    draw.text((4, 4), f"{clock}   |   {label}   |   GOES-West", font=font(17), fill="#222222")
-    legend = ("Visible reflectance: clouds, haze and terrain" if mode == "visible"
-              else "Low water clouds: often aqua / pale green")
-    draw.text((4, TOP + MAP_HEIGHT + 5), legend, font=font(16), fill="#222222")
-    draw.text((4, HEIGHT - 21), "Scan start time   |   CIRA/NOAA   |   Coast: Natural Earth", font=font(14), fill="#555555")
+    draw.text((4, 4), clock, font=font(17), fill="#222222")
     return output
 
 

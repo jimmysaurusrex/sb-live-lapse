@@ -222,9 +222,10 @@ test('successful still loads only one local image and no loop until requested', 
   assert.equal(ui.satelliteRequests().length, 2);
 });
 
-test('loop is opt-in, displays a download size, stops for chart navigation, and reuses its download', async () => {
+test('loop is opt-in, gives download size in a tooltip, stops for chart navigation, and reuses its download', async () => {
   const ui = setup(); await ui.loaded();
-  assert.match(ui.playSatellite.textContent, /314 KB/);
+  assert.equal(ui.playSatellite.textContent, 'Play last hour');
+  assert.match(ui.playSatellite.title, /314 KB/);
   ui.playSatellite.emit('click'); ui.flush();
   await tick();
   assert.match(ui.satelliteRequests().at(-1).url, /\.gif$/);

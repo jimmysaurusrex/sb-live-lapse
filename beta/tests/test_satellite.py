@@ -65,7 +65,7 @@ class SatelliteTests(unittest.TestCase):
             self.assertLess(manifest['image_bytes'], 80_000)
             self.assertEqual(len([u for u in requests if u.endswith('.png')]), 3)
             with Image.open(output / manifest['image']) as image:
-                self.assertEqual(image.size, (600, 466))
+                self.assertEqual(image.size, (600, 418))
             with Image.open(output / manifest['loop']) as loop:
                 self.assertEqual(loop.n_frames, 3)
             self.assertEqual(json.loads((output / 'latest.json').read_text()), manifest)

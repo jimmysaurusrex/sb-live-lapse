@@ -73,8 +73,16 @@ body {
 #loadSatellite { margin: 4px 0; }
 #playSatellite { display: block; margin: 4px 0; }
 #playSatellite[hidden] { display: none; }
-.satellite-note { color: #666; font-size: 12px; }
-.satellite-stale { color: #9b3d13; }
+.satellite-section .satellite-status {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
 
 /* Visual field guide. Chart styles deliberately match the live plot. */
 .faq-page { margin: 0; color: #252525; background: #fff; line-height: 1.5; }
