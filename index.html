@@ -39,5 +39,15 @@
     >Is today a good day to fly?</a>
   </div>
   <img id="chart" src="./sba_wwtemp_chart_metric.svg" alt="Santa Barbara lapse chart" />
+  <section id="satelliteSection" class="satellite-section" aria-labelledby="satelliteHeading">
+    <h2 id="satelliteHeading">GOES-WEST - Painted Cave to Rincon</h2>
+    <p id="satelliteCaption" hidden></p>
+    <p id="satelliteStatus" class="satellite-status" role="status">Loads after the chart, when this section is in view.</p>
+    <button id="loadSatellite" class="control-button" type="button" disabled hidden>Load satellite image</button>
+    <img id="satelliteImage" width="600" height="418" decoding="async" fetchpriority="low"
+      aria-describedby="satelliteCaption" title="Satellite imagery: CIRA/NOAA. Coastline: Natural Earth."
+      alt="GOES-West cloud imagery from Painted Cave to Rincon, with the coastline and Santa Barbara and Carpinteria marked. North is up; scan time is printed on each frame." hidden />
+    <button id="playSatellite" class="control-button" type="button" disabled hidden>Play last hour</button>
+  </section>
 </body>
 </html>

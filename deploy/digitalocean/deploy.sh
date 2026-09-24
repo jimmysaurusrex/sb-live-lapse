@@ -24,6 +24,8 @@ fi
 
 sudo -u "${SERVICE_USER}" git -C "${REPO_DIR}" pull --ff-only origin main
 
+bash "${REPO_DIR}/deploy/digitalocean/setup-satellite.sh"
+
 install -m 0644 "${REPO_DIR}/deploy/digitalocean/sb-live-lapse-refresh.service" /etc/systemd/system/sb-live-lapse-refresh.service
 install -m 0644 "${REPO_DIR}/deploy/digitalocean/sb-live-lapse-refresh.timer" /etc/systemd/system/sb-live-lapse-refresh.timer
 

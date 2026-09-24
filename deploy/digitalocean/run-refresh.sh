@@ -43,6 +43,10 @@ for path in "${files[@]}"; do
   install -m 0644 "${path}" "${stage_dir}/${path}"
 done
 
+# Shared generated imagery survives atomic chart releases. The independent
+# satellite service owns its updates; chart refreshes do not fetch satellite data.
+ln -s "${PUBLISH_ROOT}/satellite" "${stage_dir}/satellite"
+
 if [ -d snapshots ]; then
   cp -R snapshots "${stage_dir}/snapshots"
 fi

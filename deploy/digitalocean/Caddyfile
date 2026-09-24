@@ -2,12 +2,12 @@ __SITE_ADDRESS__ {
 	root * __PUBLISH_ROOT__/current
 	encode zstd gzip
 
-	@live path /station_state.json /station_history.json /sba_wwtemp_chart.svg /sba_wwtemp_chart_metric.svg /sba_wwtemp_chart_imperial.svg /healthz.json /snapshots/*
+	@live path /station_state.json /station_history.json /sba_wwtemp_chart.svg /sba_wwtemp_chart_metric.svg /sba_wwtemp_chart_imperial.svg /healthz.json /snapshots/* /satellite/latest.json
 	header @live Cache-Control "no-store"
 
 	@html path / /index.html /faq.html
 	header @html Cache-Control "no-cache"
-	header @html Content-Security-Policy "default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; form-action 'none'; script-src 'self'; style-src 'self'; img-src 'self'; connect-src 'self'; upgrade-insecure-requests"
+	header @html Content-Security-Policy "default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; form-action 'none'; script-src 'self'; style-src 'self'; img-src 'self' blob:; connect-src 'self'; upgrade-insecure-requests"
 
 	@page_assets path /app.js /faq.js /styles.css
 	header @page_assets Cache-Control "no-cache"

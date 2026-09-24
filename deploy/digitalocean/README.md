@@ -37,7 +37,7 @@ sudo SB_LAPSE_SITE=lapse.example.com bash deploy/digitalocean/install.sh
 
 The installer:
 
-- installs `git`, `python3`, `rsync`, and `caddy`
+- installs `git`, `python3`, `python3-venv`, `rsync`, and `caddy`
 - creates the `sb-live-lapse` service user
 - clones the repo to `/opt/sb-live-lapse/repo`
 - writes `/etc/sb-live-lapse.env` if it does not exist
@@ -71,3 +71,13 @@ The workflow SSHes into the droplet and runs [`deploy.sh`](deploy.sh).
 - Each successful refresh stages a new static release and atomically switches `/srv/sb-live-lapse/current`.
 - Old staged releases are pruned automatically.
 - GitHub Pages remains untouched until you decide to cut over.
+
+## Satellite imagery
+
+`setup-satellite.sh` installs the main site's isolated Pillow environment and
+`sb-live-lapse-satellite.service` / `.timer`. The timer checks CIRA/NOAA imagery
+independently of station fetching; chart publishing adds a link to
+`/srv/sb-live-lapse/satellite` in every release. The frontend requests the compact
+still only after its chart/data finish loading, and downloads a loop only on tap.
+See [satellite/README.md](../../satellite/README.md) for source and rendering details.
+The separate beta route, satellite data, and timers remain unchanged.

@@ -24,11 +24,17 @@ jobs:
         with:
           python-version: "3.11"
 
-      - name: Test station feed handling
+      - name: Install satellite rendering dependency
+        run: python3 -m pip install -r satellite/requirements.txt
+
+      - name: Test station feeds and satellite rendering
         run: python3 -m unittest discover -s tests -v
 
-      - name: Test chart time controls
-        run: node --test tests/test_controls.cjs
+      - name: Test chart controls and deferred satellite loading
+        run: node --test tests/test_*.cjs
+
+      - name: Check deployment scripts
+        run: bash -n deploy/digitalocean/*.sh
 
       - name: Build chart (with retry)
         run: |
@@ -159,6 +165,11 @@ jobs:
           if-no-files-found: warn
           retention-days: 14
 
+      - name: Build optional satellite crop for Pages
+        continue-on-error: true
+        timeout-minutes: 2
+        run: python3 satellite/build_satellite.py --output-dir satellite-output
+
       - name: Prepare site artifact
         run: |
           mkdir -p site
@@ -173,6 +184,7 @@ jobs:
           cp station_state.json site/
           cp station_history.json site/
           if [ -d snapshots ]; then cp -R snapshots site/; fi
+          if [ -f satellite-output/latest.json ]; then cp -R satellite-output site/satellite; fi
 
       - uses: actions/upload-pages-artifact@v4
         with:

@@ -17,6 +17,203 @@
   window.location.replace(target);
 })();
 
+function createSatelliteLoader(chart, dataReady) {
+  var section = document.getElementById("satelliteSection");
+  if (!section) return { pause: function () {}, schedule: function () {} };
+  var image = document.getElementById("satelliteImage");
+  var status = document.getElementById("satelliteStatus");
+  var button = document.getElementById("loadSatellite");
+  var loopButton = document.getElementById("playSatellite");
+  var caption = document.getElementById("satelliteCaption");
+  var connection = navigator.connection;
+  var pageLoaded = document.readyState === "complete";
+  var visible = false, requested = false, finished = false, failed = false;
+  var active = null, timer = null, pendingUrl = null;
+  var stillUrl = null, loopUrl = null, manifest = null;
+  var loopRequested = false, playing = false;
+  var waitingText = "Loads after the chart, when this section is in view.";
+
+  function conserveData() {
+    return connection && (connection.saveData || /^(slow-2g|2g|3g)$/.test(connection.effectiveType));
+  }
+  function coreReady() {
+    return pageLoaded && dataReady() && chart.complete && chart.naturalWidth > 0;
+  }
+  function eligible() {
+    return (!finished || loopRequested) && !active && coreReady() && document.visibilityState !== "hidden" &&
+      (visible || requested || loopRequested) &&
+      (requested || loopRequested || (!failed && !conserveData() && "IntersectionObserver" in window));
+  }
+  function updateCaption() {
+    if (!manifest) return;
+    var observed = new Date(manifest.observed_at);
+    var minutes = Math.max(0, Math.floor((Date.now() - observed.getTime()) / 60000));
+    var when = new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", hour: "2-digit",
+      minute: "2-digit", hourCycle: "h23", timeZone: "America/Los_Angeles", timeZoneName: "short" }).format(observed);
+    caption.textContent = "Latest scan: " + when + " · " + (manifest.mode === "visible" ? "Visible" : "Night low clouds") +
+      " · " + minutes + " min old" + (minutes > 30 ? " — delayed" : "") +
+      (manifest.twilight ? " · Twilight: reduced reliability" : "");
+    caption.classList.toggle("satellite-stale", minutes > 30);
+  }
+  function schedule() {
+    button.hidden = finished || (!failed && !conserveData() && "IntersectionObserver" in window);
+    button.disabled = !coreReady() || !!active;
+    loopButton.hidden = !finished || !manifest || !manifest.loop;
+    loopButton.disabled = !coreReady() || !!active;
+    loopButton.textContent = playing ? "Stop loop" : "Play last hour";
+    loopButton.title = manifest && manifest.loop ? "Download: " + Math.ceil(manifest.loop_bytes / 1024) + " KB" : "";
+    if (!finished && !active && !failed) {
+      status.textContent = !requested && conserveData() ? "Satellite image paused to save data. Tap to load." : waitingText;
+    }
+    if (timer !== null || !eligible()) return;
+    timer = setTimeout(function () {
+      timer = null;
+      if (eligible()) load();
+    }, 250);
+  }
+  function stopLoop() {
+    loopRequested = false;
+    playing = false;
+    if (stillUrl) image.src = stillUrl;
+  }
+  function pause() {
+    if (timer !== null) clearTimeout(timer);
+    timer = null;
+    if (active) {
+      active.abort();
+      active = null;
+      image.onload = null;
+      image.onerror = null;
+      if (pendingUrl) URL.revokeObjectURL(pendingUrl);
+      pendingUrl = null;
+      if (!finished) image.removeAttribute("src");
+      status.textContent = waitingText;
+      status.hidden = finished;
+    }
+    stopLoop();
+    scheduleButtonsOnly();
+  }
+  function scheduleButtonsOnly() {
+    loopButton.disabled = true;
+    loopButton.textContent = "Play last hour";
+  }
+  function failure(isLoop) {
+    active = null;
+    status.hidden = false;
+    if (isLoop) {
+      stopLoop();
+      status.textContent = "Loop unavailable. Tap Play to retry.";
+    } else {
+      failed = true;
+      requested = false;
+      image.hidden = true;
+      status.textContent = "Satellite image unavailable. Tap Retry to try again.";
+      button.textContent = "Retry satellite image";
+    }
+    schedule();
+  }
+  function validManifest(data) {
+    if (!data || !/^\d{14}-(visible|night)-v\d+\.jpg$/.test(data.image) ||
+        !Number.isFinite(new Date(data.observed_at).getTime()) || !/^(visible|night)$/.test(data.mode)) {
+      throw new Error("Invalid satellite metadata");
+    }
+    if (data.loop && (!/^\d{14}-\d{14}-\d+-v\d+\.gif$/.test(data.loop) ||
+        !Number.isFinite(data.loop_bytes) || data.loop_bytes <= 0)) {
+      throw new Error("Invalid satellite loop");
+    }
+    return data;
+  }
+  function load() {
+    var isLoop = finished && loopRequested;
+    if (isLoop && loopUrl) {
+      playing = true;
+      loopRequested = false;
+      image.src = loopUrl;
+      status.hidden = true;
+      schedule();
+      return;
+    }
+    var request = new AbortController();
+    active = request;
+    button.disabled = loopButton.disabled = true;
+    status.hidden = false;
+    status.textContent = isLoop ? "Loading last hour…" : "Loading satellite image…";
+    var options = { signal: request.signal, priority: "low", cache: "no-cache", credentials: "omit", referrerPolicy: "no-referrer" };
+    // Both metadata and imagery wait for the chart, its data, window load and viewport.
+    var metadata = isLoop ? Promise.resolve(manifest) : fetch("./satellite/latest.json", options).then(function (response) {
+      if (!response.ok) throw new Error("Satellite metadata unavailable");
+      return response.json();
+    }).then(validManifest);
+    metadata.then(function (data) {
+      if (active !== request) return null;
+      manifest = data;
+      return fetch("./satellite/" + (isLoop ? data.loop : data.image), options);
+    }).then(function (response) {
+      if (active !== request) return null;
+      var type = isLoop ? "image/gif" : "image/jpeg";
+      if (!response.ok || (response.headers.get("content-type") || "").split(";")[0] !== type) {
+        throw new Error("Satellite image unavailable");
+      }
+      return response.blob();
+    }).then(function (blob) {
+      if (active !== request) return;
+      pendingUrl = URL.createObjectURL(blob);
+      image.onload = function () {
+        if (active !== request) return;
+        if (isLoop) {
+          loopUrl = pendingUrl;
+          playing = true;
+          loopRequested = false;
+        } else {
+          stillUrl = pendingUrl;
+          finished = true;
+        }
+        pendingUrl = null;
+        active = null;
+        image.onload = image.onerror = null;
+        image.hidden = false;
+        status.hidden = true;
+        updateCaption();
+        schedule();
+      };
+      image.onerror = function () {
+        if (active !== request) return;
+        URL.revokeObjectURL(pendingUrl);
+        pendingUrl = null;
+        image.onload = image.onerror = null;
+        failure(isLoop);
+      };
+      image.src = pendingUrl;
+    }).catch(function () { if (active === request) failure(isLoop); });
+  }
+  button.addEventListener("click", function () { requested = true; schedule(); });
+  loopButton.addEventListener("click", function () {
+    if (playing) stopLoop();
+    else if (finished && manifest && manifest.loop) loopRequested = true;
+    schedule();
+  });
+  chart.addEventListener("load", schedule);
+  window.addEventListener("load", function () { pageLoaded = true; schedule(); }, { once: true });
+  document.addEventListener("visibilitychange", function () {
+    if (document.visibilityState === "hidden") pause();
+    else { updateCaption(); schedule(); }
+  });
+  if (connection && connection.addEventListener) connection.addEventListener("change", function () {
+    if (conserveData() && !requested && !loopRequested) pause();
+    schedule();
+  });
+  if ("IntersectionObserver" in window) {
+    var observer = new IntersectionObserver(function (entries) {
+      visible = entries.some(function (entry) { return entry.isIntersecting; });
+      schedule();
+    }, { rootMargin: "0px" });
+    observer.observe(section);
+  }
+  setInterval(updateCaption, 60000); // Text only; never fetch in the background.
+  schedule();
+  return { pause: pause, schedule: schedule };
+}
+
 (function initChartControls() {
   var slotMs = 15 * 60 * 1000;
   var slot = Math.floor(Date.now() / slotMs);
@@ -31,6 +228,9 @@
 
   if (!img || !title || !metricBtn || !imperialBtn || !prevBtn || !nextBtn || !daySelect || !timeInput) return;
 
+  var historySettled = false;
+  var latestStateSettled = false;
+  var satellite = createSatelliteLoader(img, function () { return historySettled && latestStateSettled; });
   var storageKey = "sb_units";
   var snapshotPathRe = /^snapshots\/\d{8}T\d{4}Z_(metric|imperial)\.svg$/;
   var latestSources = {
@@ -197,7 +397,8 @@
         if (!latestState || !latestState.generated_at || currentSnapshot()) return;
         setTitleForIso(latestState.generated_at);
       })
-      .catch(function () {});
+      .catch(function () {})
+      .finally(function () { latestStateSettled = true; satellite.schedule(); });
   }
 
   function render() {
@@ -205,10 +406,12 @@
     updateNavButtons();
     updateSnapshotFields();
     var snapshot = currentSnapshot();
+    satellite.pause();
     img.src = sourceForSnapshot(snapshot, state.unit);
     if (!snapshot || !setTitleForIso(snapshot.run_at)) {
       fetchLatestTitle();
     }
+    satellite.schedule();
   }
 
   function setUnit(unit) {
@@ -278,5 +481,6 @@
       populateDays();
       render();
     })
-    .catch(function () {});
+    .catch(function () {})
+    .finally(function () { historySettled = true; satellite.schedule(); });
 })();

@@ -16,7 +16,7 @@ ENV_FILE="/etc/sb-live-lapse.env"
 
 export DEBIAN_FRONTEND=noninteractive
 apt-get update
-apt-get install -y caddy git python3 rsync sudo
+apt-get install -y caddy git python3 python3-venv rsync sudo
 
 if ! id -u "${SERVICE_USER}" >/dev/null 2>&1; then
   useradd --system --create-home --home-dir "${APP_ROOT}" --shell /bin/bash "${SERVICE_USER}"

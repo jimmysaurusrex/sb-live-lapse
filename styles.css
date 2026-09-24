@@ -66,6 +66,24 @@ body {
   height: auto;
 }
 
+.satellite-section { max-width: 600px; margin-top: 16px; font-size: 13px; }
+.satellite-section h2 { font-size: 14px; margin: 0 0 6px; }
+.satellite-section p { margin: 6px 0; }
+#satelliteImage { max-width: 100%; height: auto; margin-top: 8px; }
+#loadSatellite { margin: 4px 0; }
+#playSatellite { display: block; margin: 4px 0; }
+#playSatellite[hidden] { display: none; }
+.satellite-section .satellite-status {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
 /* Visual field guide. Chart styles deliberately match the live plot. */
 .faq-page { margin: 0; color: #252525; background: #fff; line-height: 1.5; }
 .faq-page * { box-sizing: border-box; }

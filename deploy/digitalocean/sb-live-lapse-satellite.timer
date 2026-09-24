@@ -1,0 +1,10 @@
+[Unit]
+Description=Check for a new Santa Barbara satellite scan every five minutes
+
+[Timer]
+OnCalendar=*-*-* *:04/5:00
+RandomizedDelaySec=15
+Persistent=true
+
+[Install]
+WantedBy=timers.target
