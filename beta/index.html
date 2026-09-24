@@ -40,5 +40,13 @@
     >Is today a good day to fly?</a>
   </div>
   <img id="chart" src="./sba_wwtemp_chart_metric.svg" alt="Santa Barbara lapse chart" />
+  <section id="satelliteSection" class="satellite-section" aria-labelledby="satelliteHeading">
+    <h2 id="satelliteHeading">GOES-West satellite · Southern California</h2>
+    <p>Latest GeoColor image · independent of the chart’s selected time · <a href="https://www.star.nesdis.noaa.gov/GOES/wfo.php?wfo=lox" target="_blank" rel="noopener noreferrer">CIRA/NOAA</a></p>
+    <p id="satelliteStatus" role="status">Loads after the chart, when this section is in view.</p>
+    <button id="loadSatellite" class="control-button" type="button" disabled hidden>Load satellite image</button>
+    <img id="satelliteImage" width="600" height="600" decoding="async" fetchpriority="low"
+      alt="Latest GOES-West GeoColor satellite image of the Los Angeles/Oxnard region, including Santa Barbara; image time is printed on the image." hidden />
+  </section>
 </body>
 </html>

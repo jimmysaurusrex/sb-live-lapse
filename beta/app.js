@@ -17,6 +17,139 @@
   window.location.replace(target);
 })();
 
+function createSatelliteLoader(chart, dataReady) {
+  var section = document.getElementById("satelliteSection");
+  if (!section) return { pause: function () {}, schedule: function () {} };
+  var image = document.getElementById("satelliteImage");
+  var status = document.getElementById("satelliteStatus");
+  var button = document.getElementById("loadSatellite");
+  var connection = navigator.connection;
+  var pageLoaded = document.readyState === "complete";
+  var visible = false;
+  var requested = false;
+  var finished = false;
+  var failed = false;
+  var active = null;
+  var timer = null;
+  var objectUrl = null;
+  var waitingText = "Loads after the chart, when this section is in view.";
+
+  function conserveData() {
+    return connection && (connection.saveData || /^(slow-2g|2g|3g)$/.test(connection.effectiveType));
+  }
+
+  function coreReady() {
+    return pageLoaded && dataReady() && chart.complete && chart.naturalWidth > 0;
+  }
+
+  function eligible() {
+    return !finished && !active && coreReady() && document.visibilityState !== "hidden" &&
+      (visible || requested) && (requested || (!failed && !conserveData() && "IntersectionObserver" in window));
+  }
+
+  function schedule() {
+    button.hidden = finished || (!failed && !conserveData() && "IntersectionObserver" in window);
+    button.disabled = !coreReady() || !!active;
+    if (!finished && !active && !failed) {
+      status.textContent = !requested && conserveData() ? "Satellite image paused to save data. Tap to load." : waitingText;
+    }
+    if (timer !== null || !eligible()) return;
+    // The delay yields a paint and lets rapid chart navigation finish. Readiness
+    // is checked again afterwards; a timer or low priority alone is insufficient.
+    timer = setTimeout(function () {
+      timer = null;
+      if (eligible()) load();
+    }, 250);
+  }
+
+  function pause() {
+    if (timer !== null) clearTimeout(timer);
+    timer = null;
+    if (active) {
+      active.abort();
+      active = null;
+      image.onload = null;
+      image.onerror = null;
+      image.removeAttribute("src");
+      releaseObjectUrl();
+      status.textContent = waitingText;
+    }
+  }
+
+  function failure() {
+    failed = true;
+    requested = false;
+    active = null;
+    image.hidden = true;
+    status.textContent = "Satellite image unavailable. Retry or open CIRA/NOAA above.";
+    button.textContent = "Retry satellite image";
+    schedule();
+  }
+
+  function releaseObjectUrl() {
+    if (objectUrl) URL.revokeObjectURL(objectUrl);
+    objectUrl = null;
+  }
+
+  function load() {
+    var request = new AbortController();
+    active = request;
+    button.disabled = true;
+    status.textContent = "Loading satellite image…";
+    // No src, srcset, preload, preconnect, metadata or image request is issued
+    // until all page data and the currently selected chart have finished loading.
+    fetch("https://cdn.star.nesdis.noaa.gov/WFO/lox/GEOCOLOR/600x600.jpg", {
+      signal: request.signal, priority: "low", cache: "no-cache", credentials: "omit", referrerPolicy: "no-referrer"
+    }).then(function (response) {
+      if (!response.ok || (response.headers.get("content-type") || "").split(";")[0] !== "image/jpeg") {
+        throw new Error("Satellite image unavailable");
+      }
+      return response.blob();
+    }).then(function (blob) {
+      if (active !== request) return;
+      objectUrl = URL.createObjectURL(blob);
+      image.onload = function () {
+        if (active !== request) return;
+        finished = true;
+        active = null;
+        image.hidden = false;
+        status.hidden = true;
+        button.hidden = true;
+        releaseObjectUrl();
+      };
+      image.onerror = function () {
+        if (active !== request) return;
+        releaseObjectUrl();
+        failure();
+      };
+      image.src = objectUrl;
+    }).catch(function () {
+      if (active === request) failure();
+    });
+  }
+
+  button.addEventListener("click", function () { requested = true; schedule(); });
+  chart.addEventListener("load", schedule);
+  window.addEventListener("load", function () { pageLoaded = true; schedule(); }, { once: true });
+  document.addEventListener("visibilitychange", function () {
+    if (document.visibilityState === "hidden") pause();
+    else schedule();
+  });
+  if (connection && connection.addEventListener) connection.addEventListener("change", function () {
+    if (conserveData() && !requested) pause();
+    schedule();
+  });
+  if ("IntersectionObserver" in window) {
+    var observer = new IntersectionObserver(function (entries) {
+      visible = entries.some(function (entry) { return entry.isIntersecting; });
+      schedule();
+    }, { rootMargin: "0px" });
+    observer.observe(section);
+  }
+  schedule();
+  return { pause: pause, schedule: schedule };
+}
+
 (function initChartControls() {
   var slotMs = 15 * 60 * 1000;
   var slot = Math.floor(Date.now() / slotMs);
@@ -31,6 +164,9 @@
 
   if (!img || !title || !metricBtn || !imperialBtn || !prevBtn || !nextBtn || !daySelect || !timeInput) return;
 
+  var historySettled = false;
+  var latestStateSettled = false;
+  var satellite = createSatelliteLoader(img, function () { return historySettled && latestStateSettled; });
   var storageKey = "sb_beta_units";
   var snapshotPathRe = /^snapshots\/\d{8}T\d{4}Z_(metric|imperial)\.svg$/;
   var latestSources = {
@@ -197,7 +333,8 @@
         if (!latestState || !latestState.generated_at || currentSnapshot()) return;
         setTitleForIso(latestState.generated_at);
       })
-      .catch(function () {});
+      .catch(function () {})
+      .finally(function () { latestStateSettled = true; satellite.schedule(); });
   }
 
   function render() {
@@ -205,10 +342,12 @@
     updateNavButtons();
     updateSnapshotFields();
     var snapshot = currentSnapshot();
+    satellite.pause();
     img.src = sourceForSnapshot(snapshot, state.unit);
     if (!snapshot || !setTitleForIso(snapshot.run_at)) {
       fetchLatestTitle();
     }
+    satellite.schedule();
   }
 
   function setUnit(unit) {
@@ -278,5 +417,6 @@
       populateDays();
       render();
     })
-    .catch(function () {});
+    .catch(function () {})
+    .finally(function () { historySettled = true; satellite.schedule(); });
 })();

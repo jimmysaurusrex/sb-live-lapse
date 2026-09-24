@@ -22,5 +22,5 @@ jobs:
         run: |
           python3 -m unittest discover -s tests -v
           python3 -m unittest discover -s beta/tests -v
-          node --test beta/tests/test_controls.cjs
+          node --test beta/tests/test_*.cjs
           bash -n beta/deploy/install.sh beta/deploy/refresh.sh beta/deploy/publish.sh

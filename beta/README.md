@@ -16,7 +16,7 @@ its SVG text labels. The primary chart's colors, dimensions, axes, geometry and 
 calculations are preserved. Labels near the right edge can flip left using the
 original chart's sizing rule. Each historical chart uses its own snapshot's dew
 points. Source observation times and missing/stale behavior remain those of the
-primary chart. No additional cloud feeds or imagery are fetched.
+primary chart. No additional station or cloud-observation feeds are fetched.
 
 Primary HTML, CSS, JavaScript, SVGs, data, checkout and refresh job are read-only
 inputs. Beta keeps its own unit preference (`sb_beta_units`), the primary chart
@@ -31,12 +31,28 @@ snapshot's actual time. Arrow navigation and unit changes keep both fields in
 sync. Escape cancels an edit. Missing history leaves the fields disabled while
 the latest chart remains usable.
 
+The bottom of the page includes the original CIRA/NOAA GOES-West GeoColor image
+for the Los Angeles/Oxnard region. It is the latest NOAA image, independent of the
+selected historical chart; its observation timestamp is printed on the image.
+Only one 600×600 JPEG is downloaded (roughly 400 KB, varying by scene), with no
+animation, metadata fetch, preload, or preconnect. The image has no initial `src`.
+
+Its request waits for window load, both chart-data fetches to settle, the selected
+chart image to load successfully, and the satellite section to enter the actual
+viewport. It uses low fetch priority and asynchronous image decoding. Save-Data,
+2G, or 3G connections reported by the browser require a tap; browsers without
+IntersectionObserver also show a load button. The button cannot bypass the chart
+readiness gate. Changing charts or hiding the page aborts a pending satellite
+download; it can resume after the chart is ready. Failed downloads require an
+explicit retry. Successfully loaded images are retained across chart navigation
+and are not refreshed automatically.
+
 ## Local preview and checks
 
 ```sh
 python3 -m unittest discover -s tests -v
 python3 -m unittest discover -s beta/tests -v
-node --test beta/tests/test_controls.cjs
+node --test beta/tests/test_*.cjs
 python3 beta/build_charts.py --primary-dir /path/to/primary-release --output-dir beta/preview
 cp beta/index.html beta/app.js beta/styles.css beta/preview/
 python3 -m http.server 8765 --bind 127.0.0.1
