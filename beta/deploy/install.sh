@@ -20,11 +20,23 @@ primary_hash="$(sha256sum "${primary_root}/index.html" "${primary_root}/app.js" 
 
 install -d -o sb-live-lapse -g sb-live-lapse "${beta_root}" "${beta_root}/releases"
 install -d "${code_root}"
+# Rendering dependencies belong only to beta, never to the primary application.
+if ! "${code_root}/satellite-venv/bin/python" -m pip --version >/dev/null 2>&1; then
+    if ! python3 -m venv "${code_root}/satellite-venv"; then
+        apt-get update -qq
+        DEBIAN_FRONTEND=noninteractive NEEDRESTART_MODE=l apt-get install -y --no-install-recommends python3-venv
+        python3 -m venv "${code_root}/satellite-venv"
+    fi
+fi
+"${code_root}/satellite-venv/bin/python" -m pip install --disable-pip-version-check \
+    --require-virtualenv -r "${source_dir}/requirements-satellite.txt"
+install -d -o sb-live-lapse -g sb-live-lapse "${beta_root}/satellite"
 stage="${beta_root}/releases/${revision}"
 install -d -o sb-live-lapse -g sb-live-lapse "$stage"
 for asset in index.html styles.css app.js; do
     install -m 0644 "${source_dir}/${asset}" "${stage}/${asset}"
 done
+ln -sfn ../../satellite "${stage}/satellite"
 for artifact in station_state.json station_history.json sba_wwtemp_chart.svg sba_wwtemp_chart_metric.svg sba_wwtemp_chart_imperial.svg snapshots; do
     ln -sfn "../../chart-data/${artifact}" "${stage}/${artifact}"
 done
@@ -37,6 +49,11 @@ import json, sys
 data = json.load(open(sys.argv[1]))
 assert data.get('stations'), 'Beta profile missing'
 PY
+# Require a real crop before publishing the first satellite release. Use the
+# same lock as its independent timer when subsequent beta releases are installed.
+sudo -u sb-live-lapse flock -w 90 "${beta_root}/.satellite.lock" \
+    "${code_root}/satellite-venv/bin/python" "${source_dir}/build_satellite.py" \
+    --output-dir "${beta_root}/satellite"
 
 # Validate a candidate config first. Apart from one /beta-only import, the
 # existing site's configuration remains byte-for-byte identical.
@@ -81,8 +98,11 @@ if ! systemctl reload caddy; then
 fi
 install -m 0644 "${source_dir}/deploy/sb-live-lapse-beta.service" /etc/systemd/system/
 install -m 0644 "${source_dir}/deploy/sb-live-lapse-beta.timer" /etc/systemd/system/
+install -m 0644 "${source_dir}/deploy/sb-live-lapse-beta-satellite.service" /etc/systemd/system/
+install -m 0644 "${source_dir}/deploy/sb-live-lapse-beta-satellite.timer" /etc/systemd/system/
 systemctl daemon-reload
 systemctl enable --now sb-live-lapse-beta.timer
+systemctl enable --now sb-live-lapse-beta-satellite.timer
 systemctl start sb-live-lapse-beta.service
 test "$primary_hash" = "$(sha256sum "${primary_root}/index.html" "${primary_root}/app.js" "${primary_root}/styles.css")"
 systemctl is-active --quiet sb-live-lapse-refresh.timer

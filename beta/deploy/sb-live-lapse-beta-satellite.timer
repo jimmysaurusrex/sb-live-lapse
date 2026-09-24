@@ -1,0 +1,10 @@
+[Unit]
+Description=Check for a new beta satellite scan every five minutes
+
+[Timer]
+OnCalendar=*-*-* *:02/5:00
+RandomizedDelaySec=15
+Persistent=true
+
+[Install]
+WantedBy=timers.target

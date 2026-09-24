@@ -35,7 +35,7 @@ class Element {
 
 function setup(connection = {}, observerSupported = true) {
   const ids = ['chart', 'chartTitle', 'metricBtn', 'imperialBtn', 'prevSnapshotBtn', 'nextSnapshotBtn',
-    'snapshotDay', 'snapshotTime', 'satelliteSection', 'satelliteImage', 'satelliteStatus', 'loadSatellite'];
+    'snapshotDay', 'snapshotTime', 'satelliteSection', 'satelliteImage', 'satelliteStatus', 'loadSatellite', 'playSatellite', 'satelliteCaption'];
   const elements = Object.fromEntries(ids.map(id => [id, new Element()]));
   const document = Object.assign(new Element(), {
     readyState: 'interactive', visibilityState: 'visible',
@@ -49,19 +49,20 @@ function setup(connection = {}, observerSupported = true) {
   }
   if (observerSupported) window.IntersectionObserver = Observer;
   const requests = [], timers = new Map(), revoked = [];
-  let timerId = 0;
+  let timerId = 0, urlId = 0;
   vm.runInNewContext(source, {
     document, window, navigator: { connection }, IntersectionObserver: Observer,
     AbortController, Date, Intl,
-    URL: { createObjectURL: () => 'blob:satellite', revokeObjectURL: value => revoked.push(value) },
+    URL: { createObjectURL: () => 'blob:satellite' + (++urlId), revokeObjectURL: value => revoked.push(value) },
     localStorage: { getItem() {}, setItem() {} },
     setTimeout: callback => { timers.set(++timerId, callback); return timerId; },
     clearTimeout: id => timers.delete(id),
+    setInterval: () => 1,
     fetch: (url, options) => new Promise((resolve, reject) => {
       requests.push({ url, options, resolve, reject });
     })
   });
-  const satelliteRequests = () => requests.filter(r => r.url.startsWith('https://'));
+  const satelliteRequests = () => requests.filter(r => r.url.startsWith('./satellite/'));
   const flush = () => { const pending = [...timers.values()]; timers.clear(); pending.forEach(fn => fn()); };
   const history = { snapshots: [{ run_at: '2026-09-23T21:40:00Z', charts: {
     metric_svg: 'snapshots/20260923T2140Z_metric.svg', imperial_svg: 'snapshots/20260923T2140Z_imperial.svg'
@@ -78,7 +79,22 @@ function setup(connection = {}, observerSupported = true) {
     window.emit('load');
     intersection?.([{ isIntersecting: true }]);
   }
+  const manifest = { image: '20260924003021-visible-v1.jpg', observed_at: '2026-09-24T00:30:21Z',
+    mode: 'visible', loop: '20260924003021-20260923233021-7-v1.gif', loop_bytes: 321400 };
+  async function resolveManifest(data = manifest) {
+    satelliteRequests().findLast(r => r.url.endsWith('latest.json')).resolve({ ok: true, json: async () => data });
+    await tick();
+  }
+  async function resolveImage(type = 'image/jpeg') {
+    satelliteRequests().at(-1).resolve({ ok: true, headers: { get: () => type }, blob: async () => ({}) });
+    await tick();
+    elements.satelliteImage.loaded();
+  }
+  async function loaded() {
+    await ready(); flush(); await resolveManifest(); await resolveImage();
+  }
   return { ...elements, window, document, requests, satelliteRequests, flush, resolveData, ready, revoked,
+    resolveManifest, resolveImage, loaded,
     visible(value) { intersection?.([{ isIntersecting: value }]); } };
 }
 
@@ -193,21 +209,71 @@ test('failed downloads do not retry automatically or affect the chart', async ()
   assert.equal(ui.satelliteRequests().length, 2);
 });
 
-test('successful download displays once, releases the blob, and is not fetched again during chart navigation', async () => {
+test('successful still loads only one local image and no loop until requested', async () => {
   const ui = setup();
-  await ui.ready();
-  ui.flush();
-  ui.satelliteRequests()[0].resolve({ ok: true, headers: { get: () => 'image/jpeg' }, blob: async () => ({}) });
-  await tick();
-  assert.equal(ui.satelliteImage.src, 'blob:satellite');
-  ui.satelliteImage.loaded();
+  await ui.loaded();
+  assert.equal(ui.satelliteImage.src, 'blob:satellite1');
   assert.equal(ui.satelliteImage.hidden, false);
   assert.equal(ui.satelliteStatus.hidden, true);
-  assert.deepEqual(ui.revoked, ['blob:satellite']);
+  assert.equal(ui.satelliteRequests().length, 2, 'one manifest plus one still');
+  assert.ok(ui.satelliteRequests().every(r => r.url.startsWith('./satellite/')));
+  assert.equal(ui.playSatellite.hidden, false);
+  ui.imperialBtn.emit('click'); ui.chart.loaded(); ui.flush();
+  assert.equal(ui.satelliteRequests().length, 2);
+});
+
+test('loop is opt-in, displays a download size, stops for chart navigation, and reuses its download', async () => {
+  const ui = setup(); await ui.loaded();
+  assert.match(ui.playSatellite.textContent, /314 KB/);
+  ui.playSatellite.emit('click'); ui.flush();
+  await tick();
+  assert.match(ui.satelliteRequests().at(-1).url, /\.gif$/);
+  await ui.resolveImage('image/gif');
+  assert.equal(ui.satelliteImage.src, 'blob:satellite2');
+  assert.equal(ui.playSatellite.textContent, 'Stop loop');
   ui.imperialBtn.emit('click');
-  ui.chart.loaded();
-  ui.flush();
+  assert.equal(ui.satelliteImage.src, 'blob:satellite1');
+  ui.chart.loaded(); ui.flush();
+  ui.playSatellite.emit('click'); ui.flush();
+  assert.equal(ui.satelliteImage.src, 'blob:satellite2');
+  assert.equal(ui.satelliteRequests().length, 3);
+  ui.playSatellite.emit('click');
+  assert.equal(ui.satelliteImage.src, 'blob:satellite1');
+});
+
+test('changing charts aborts image and loop bodies as well as the metadata request', async () => {
+  const ui = setup(); await ui.ready(); ui.flush(); await ui.resolveManifest();
+  const still = ui.satelliteRequests().at(-1);
+  ui.imperialBtn.emit('click');
+  assert.equal(still.options.signal.aborted, true);
+  still.resolve({ ok: true, headers: { get: () => 'image/jpeg' }, blob: async () => ({}) });
+  await tick();
+  assert.equal(ui.satelliteImage.src, undefined, 'late body cannot render');
+  ui.chart.loaded(); ui.flush(); await ui.resolveManifest(); await ui.resolveImage();
+  ui.playSatellite.emit('click'); ui.flush(); await tick();
+  const loop = ui.satelliteRequests().at(-1);
+  ui.metricBtn.emit('click');
+  assert.equal(loop.options.signal.aborted, true);
+  assert.equal(ui.satelliteImage.src, 'blob:satellite1');
+});
+
+test('unsafe manifest paths fail without sending image requests', async () => {
+  const ui = setup(); await ui.ready(); ui.flush();
+  await ui.resolveManifest({ image: 'https://example.com/image.jpg', observed_at: '2026-09-24T00:30:21Z', mode: 'visible' });
   assert.equal(ui.satelliteRequests().length, 1);
+  assert.match(ui.satelliteStatus.textContent, /unavailable/);
+});
+
+test('a delayed satellite frame is explicitly labeled and keeps its own time', async () => {
+  const ui = setup(); await ui.ready(); ui.flush();
+  await ui.resolveManifest({ image: '20200101003021-night-v1.jpg', observed_at: '2020-01-01T00:30:21Z', mode: 'night', twilight: true });
+  await ui.resolveImage();
+  assert.match(ui.satelliteCaption.textContent, /delayed/);
+  assert.match(ui.satelliteCaption.textContent, /Night low clouds/);
+  assert.match(ui.satelliteCaption.textContent, /Twilight/);
+  const caption = ui.satelliteCaption.textContent;
+  ui.imperialBtn.emit('click'); ui.chart.loaded(); ui.flush();
+  assert.equal(ui.satelliteCaption.textContent, caption);
 });
 
 test('hidden tabs pause downloads until visible again', async () => {

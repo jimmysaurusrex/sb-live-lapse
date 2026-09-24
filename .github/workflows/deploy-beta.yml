@@ -18,9 +18,11 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
+      - name: Install beta satellite rendering dependency
+        run: python3 -m pip install -r beta/requirements-satellite.txt
       - name: Test primary and beta
         run: |
           python3 -m unittest discover -s tests -v
           python3 -m unittest discover -s beta/tests -v
           node --test beta/tests/test_*.cjs
-          bash -n beta/deploy/install.sh beta/deploy/refresh.sh beta/deploy/publish.sh
+          bash -n beta/deploy/*.sh

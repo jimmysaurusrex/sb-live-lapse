@@ -31,30 +31,55 @@ snapshot's actual time. Arrow navigation and unit changes keep both fields in
 sync. Escape cancels an edit. Missing history leaves the fields disabled while
 the latest chart remains usable.
 
-The bottom of the page includes the original CIRA/NOAA GOES-West GeoColor image
-for the Los Angeles/Oxnard region. It is the latest NOAA image, independent of the
-selected historical chart; its observation timestamp is printed on the image.
-Only one 600×600 JPEG is downloaded (roughly 400 KB, varying by scene), with no
-animation, metadata fetch, preload, or preconnect. The image has no initial `src`.
+The bottom of the page shows a north-up Santa Barbara satellite crop, from Painted
+Cave to Rincon with a small surrounding margin (119.85–119.42 W, 34.32–34.55 N).
+The coastline and Painted Cave, Santa Barbara, Carpinteria and Rincon are marked.
+CIRA/NOAA GOES-West full-disk tiles provide native Band 2 visible imagery by day
+(nominal 0.5 km at nadir) and Nighttime Microphysics at night (2 km). The local
+footprints are larger. CIRA's grid navigation is used to reproject the small crop
+with nearest-neighbor sampling; enlarging pixels does not create extra detail.
+The visible image uses fixed gamma enhancement. Solar elevation at the image
+scan time selects the product; twilight is labeled. Neither view measures cloud
+base or sees low cloud hidden under an opaque upper layer.
 
-Its request waits for window load, both chart-data fetches to settle, the selected
-chart image to load successfully, and the satellite section to enter the actual
-viewport. It uses low fetch priority and asynchronous image decoding. Save-Data,
-2G, or 3G connections reported by the browser require a tap; browsers without
-IntersectionObserver also show a load button. The button cannot bypass the chart
-readiness gate. Changing charts or hiding the page aborts a pending satellite
-download; it can resume after the chart is ready. Failed downloads require an
-explicit retry. Successfully loaded images are retained across chart navigation
-and are not refreshed automatically.
+Scans are ten minutes apart, with additional publication latency. The page shows
+the actual scan start time in Pacific time, its age (updated without network
+traffic), and a delayed label after 30 minutes. Imagery is independent of the
+selected historical weather chart. A compact still is the default (~45 KB in the
+first real preview); a last-hour GIF loop (~315 KB in that preview, scene-dependent)
+is downloaded only after tapping Play, whose label includes its size. Stop,
+chart navigation or hiding the tab returns to the still. The loop download is
+retained for replay. There are no background image downloads or automatic refreshes.
+
+Both the small metadata request and the image request wait for window load, both
+chart-data fetches to settle, the selected chart image to load successfully, and
+the satellite section to enter the actual viewport. Images have no initial src,
+preload or preconnect. Fetches have low priority and can be aborted when a chart
+changes or the page hides. Save-Data/2G/3G connections reported by the browser and
+browsers without IntersectionObserver require a tap. Taps cannot bypass the chart
+readiness gate. Failed requests require explicit retry. Browser requests stay on
+our own server; upstream tile downloads and cropping happen in a separate,
+resource-limited beta satellite service, never in a visitor's browser.
+
+`build_satellite.py` publishes dated JPEGs and an optional GIF before atomically
+replacing `latest.json`. It reuses existing frames, tolerates a not-yet-published
+newest tile, never replaces a good image with an older one, and retains the last
+good output on upstream failure. The frontend's age label then exposes the delay.
+Only generated satellite artifacts older than 24 hours are pruned. Attribution
+and projection details are recorded in `data/README.md`.
 
 ## Local preview and checks
 
+Satellite rendering requires Python 3.10 or newer.
+
 ```sh
+python3 -m pip install -r beta/requirements-satellite.txt
 python3 -m unittest discover -s tests -v
 python3 -m unittest discover -s beta/tests -v
 node --test beta/tests/test_*.cjs
 python3 beta/build_charts.py --primary-dir /path/to/primary-release --output-dir beta/preview
 cp beta/index.html beta/app.js beta/styles.css beta/preview/
+python3 beta/build_satellite.py --output-dir beta/preview/satellite
 python3 -m http.server 8765 --bind 127.0.0.1
 ```
 
@@ -81,6 +106,11 @@ invoke the primary deployment or grant its CI account new privileges.
   retained. Only beta snapshot files outside the primary history are pruned.
 - Timer/service: `sb-live-lapse-beta.timer` / `sb-live-lapse-beta.service`, every
   five minutes. The service can only write to `/srv/sb-live-lapse-beta`.
+- Satellite service/timer: `sb-live-lapse-beta-satellite.service` / `.timer`,
+  checks every five minutes independently of the chart timer; 90-second limit,
+  25% CPU quota, low CPU/I/O priority, 192 MB memory limit. Its Pillow dependency
+  lives in `/opt/sb-live-lapse-beta/satellite-venv`; outputs in
+  `/srv/sb-live-lapse-beta/satellite`. No main-site Python dependencies change.
 - Caddy: `/etc/caddy/sb-live-lapse-beta.caddy`, imported by the existing Caddyfile.
   Configuration backups are in `/opt/sb-live-lapse-beta/config-backups`.
 

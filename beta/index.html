@@ -41,12 +41,15 @@
   </div>
   <img id="chart" src="./sba_wwtemp_chart_metric.svg" alt="Santa Barbara lapse chart" />
   <section id="satelliteSection" class="satellite-section" aria-labelledby="satelliteHeading">
-    <h2 id="satelliteHeading">GOES-West satellite · Southern California</h2>
-    <p>Latest GeoColor image · independent of the chart’s selected time · <a href="https://www.star.nesdis.noaa.gov/GOES/wfo.php?wfo=lox" target="_blank" rel="noopener noreferrer">CIRA/NOAA</a></p>
+    <h2 id="satelliteHeading">GOES-West · Painted Cave to Rincon</h2>
+    <p>Latest satellite view · independent of the chart’s selected time · <a href="https://slider.cira.colostate.edu/?sat=goes-18&amp;sec=full_disk&amp;p%5B0%5D=band_02&amp;x=13855&amp;y=3975&amp;z=5&amp;im=6&amp;ts=1" target="_blank" rel="noopener noreferrer">CIRA/NOAA</a></p>
+    <p id="satelliteCaption">Visible by day · low-cloud enhancement at night · scans every 10 minutes.</p>
     <p id="satelliteStatus" role="status">Loads after the chart, when this section is in view.</p>
     <button id="loadSatellite" class="control-button" type="button" disabled hidden>Load satellite image</button>
-    <img id="satelliteImage" width="600" height="600" decoding="async" fetchpriority="low"
-      alt="Latest GOES-West GeoColor satellite image of the Los Angeles/Oxnard region, including Santa Barbara; image time is printed on the image." hidden />
+    <img id="satelliteImage" width="600" height="466" decoding="async" fetchpriority="low"
+      alt="GOES-West cloud imagery from Painted Cave to Rincon, with the coastline and Santa Barbara and Carpinteria marked. North is up; scan time is printed on each frame." hidden />
+    <button id="playSatellite" class="control-button" type="button" disabled hidden>Play last hour</button>
+    <p class="satellite-note">Cloud tops, not cloud-base height. Native detail: 0.5 km day / 2 km night at nadir; coarser here. Higher clouds can hide the marine layer.</p>
   </section>
 </body>
 </html>
