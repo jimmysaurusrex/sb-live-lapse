@@ -71,13 +71,14 @@ good output on upstream failure. The displayed scan time remains unchanged; its 
 Only generated satellite artifacts older than 24 hours are pruned. Attribution
 and projection details are recorded in `data/README.md`.
 
-The camera grid has three rows: GOES alongside a tight Gibraltar 1 south-facing
-crop (1985); a full TV Hill 2 panorama centered north (2748); and a full Ortega
-Ridge 1 panorama centered west (2761). Gibraltar's live tight camera can rotate,
-so its south view uses the corresponding pixels from the most recent panorama.
-The public panorama API supplies the midpoint azimuth and angular width; redundant
-edge overlap is trimmed and full panoramas wrap once around 360 degrees. Compass
-labels show their orientation. No physical camera controls are used.
+The camera grid has two rows: GOES alongside a tight Gibraltar 1 south-facing
+crop (1985), then a TV Hill 2 panorama cropped from 330° through north to 090°
+(2748). The TV Hill crop spans 120°, centered on 030°, with bearing labels.
+Ortega has been removed from the page and refresh job. Gibraltar's live tight
+camera can rotate, so its south view uses the corresponding pixels from the most
+recent panorama. The public panorama API supplies the midpoint azimuth and angular
+width; redundant edge overlap is trimmed when the crop crosses north. No physical
+camera controls are used.
 
 `build_cameras.py` fetches public ALERTCalifornia/UC San Diego panorama metadata
 from `https://api.cdn.prod.alertwest.com/api/panorama/list/byCamId?camId=ID&timestamp=`
@@ -137,7 +138,7 @@ invoke the primary deployment or grant its CI account new privileges.
 - Camera service/timer: `sb-live-lapse-beta-cameras.service` / `.timer`, every two
   minutes, 90-second limit, 25% CPU, 256 MB RAM; outputs in
   `/srv/sb-live-lapse-beta/cameras`. Uses the beta Pillow environment. Publishing
-  requires all three cached views before switching the beta web release.
+  requires both cached views before switching the beta web release.
 - Caddy: `/etc/caddy/sb-live-lapse-beta.caddy`, imported by the existing Caddyfile.
   Configuration backups are in `/opt/sb-live-lapse-beta/config-backups`.
 

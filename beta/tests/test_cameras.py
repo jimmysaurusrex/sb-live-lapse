@@ -59,6 +59,13 @@ class CameraTests(unittest.TestCase):
         for x, expected in [(2, colors[2]), (300, colors[3]), (600, colors[0]), (900, colors[1]), (1197, colors[2])]:
             self.assertEqual(north.getpixel((x, north.height // 2)), expected)
 
+        tvhill = cameras.direction_view(source, 163.33, 391.98, 30, 120, 1200)
+        # 330° to 090° crosses north at one quarter of the image, not its center.
+        for x, expected in [(2, colors[0]), (300, colors[0]), (900, colors[1]), (1197, colors[1])]:
+            self.assertEqual(tvhill.getpixel((x, tvhill.height // 2)), expected)
+        self.assertEqual(cameras.CAMERAS['tvhill'][2:4], (30, 120))
+        self.assertNotIn('ortega', cameras.CAMERAS)
+
     def test_refresh_reuses_files_and_retains_each_last_good_camera_on_failure(self):
         raw = io.BytesIO()
         Image.new("RGB", (11520, 1080), "gray").save(raw, "JPEG")
@@ -73,7 +80,7 @@ class CameraTests(unittest.TestCase):
 
         with tempfile.TemporaryDirectory() as temp:
             output = Path(temp)
-            self.assertEqual(cameras.refresh(output, NOW, reader), 3)
+            self.assertEqual(cameras.refresh(output, NOW, reader), 2)
             originals = {p.name: p.read_bytes() for p in output.glob("*.json")}
             for key in cameras.CAMERAS:
                 manifest = json.loads(originals[key + ".json"])
@@ -82,15 +89,15 @@ class CameraTests(unittest.TestCase):
                     self.assertEqual(image.width, 600 if key == "gibraltar" else 1200)
             self.assertEqual(list(output.glob("*.tmp")), [])
             requests.clear()
-            self.assertEqual(cameras.refresh(output, NOW, reader), 3)
-            self.assertEqual(len(requests), 3, "unchanged panoramas must not redownload")
+            self.assertEqual(cameras.refresh(output, NOW, reader), 2)
+            self.assertEqual(len(requests), 2, "unchanged panoramas must not redownload")
             self.assertEqual(cameras.refresh(output, NOW, lambda *args: b"{}"), 0)
             for name, body in originals.items():
                 self.assertEqual((output / name).read_bytes(), body)
-            # A broken camera must not prevent the other two from refreshing.
+            # A broken camera must not prevent the other one from refreshing.
             def partial(url, deadline, limit):
                 return b"{}" if "camId=1985&" in url else reader(url, deadline, limit)
-            self.assertEqual(cameras.refresh(output, NOW, partial), 2)
+            self.assertEqual(cameras.refresh(output, NOW, partial), 1)
 
 
 if __name__ == "__main__":

@@ -252,7 +252,7 @@ function createDeferredImageLoader(chart, dataReady, camera) {
 
   var historySettled = false;
   var latestStateSettled = false;
-  var imagery = [null, "gibraltar", "tvhill", "ortega"].map(function (camera) {
+  var imagery = [null, "gibraltar", "tvhill"].map(function (camera) {
     return createDeferredImageLoader(img, function () { return historySettled && latestStateSettled; }, camera);
   });
   var satellite = {

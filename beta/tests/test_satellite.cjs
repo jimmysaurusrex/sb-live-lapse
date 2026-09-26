@@ -36,7 +36,7 @@ class Element {
 function setup(connection = {}, observerSupported = true, cameras = false) {
   const ids = ['chart', 'chartTitle', 'metricBtn', 'imperialBtn', 'prevSnapshotBtn', 'nextSnapshotBtn',
     'snapshotDay', 'snapshotTime', 'satelliteSection', 'satelliteImage', 'satelliteStatus', 'loadSatellite', 'playSatellite', 'satelliteCaption'];
-  if (cameras) for (const key of ['gibraltar', 'tvhill', 'ortega']) {
+  if (cameras) for (const key of ['gibraltar', 'tvhill']) {
     ids.push(...['Section', 'Image', 'Status', 'Load', 'Caption'].map(suffix => key + suffix));
   }
   const elements = Object.fromEntries(ids.map(id => [id, new Element()]));
@@ -301,34 +301,35 @@ test('hidden tabs pause downloads until visible again', async () => {
 });
 
 
-test('all camera images have no eager source and follow the requested three-row order', () => {
-  for (const key of ['gibraltar', 'tvhill', 'ortega']) {
+test('all camera images have no eager source and follow the requested two-row order', () => {
+  for (const key of ['gibraltar', 'tvhill']) {
     const tag = html.match(new RegExp('<img id="' + key + 'Image"[\\s\\S]*?>'))[0];
     assert.doesNotMatch(tag, /\s(?:src|srcset)\s*=/);
   }
-  const ids = ['chart', 'satelliteSection', 'gibraltarSection', 'tvhillSection', 'ortegaSection'];
+  assert.doesNotMatch(html, /ortega/i);
+  const ids = ['chart', 'satelliteSection', 'gibraltarSection', 'tvhillSection'];
   const positions = ids.map(id => html.indexOf('id="' + id + '"'));
   assert.deepEqual(positions, [...positions].sort((a, b) => a - b));
 });
 
 test('each camera waits for page, chart, both data requests and its own viewport; navigation aborts all feeds', async () => {
   const ui = setup({}, true, true);
-  for (const key of ['gibraltar', 'tvhill', 'ortega']) ui.cameraVisible(key, true);
+  for (const key of ['gibraltar', 'tvhill']) ui.cameraVisible(key, true);
   const requests = () => ui.requests.filter(r => r.url.startsWith('./cameras/'));
   ui.flush(); assert.equal(requests().length, 0);
   await ui.resolveData('history');
   ui.chart.loaded(); ui.window.emit('load'); ui.flush();
   assert.equal(requests().length, 0);
-  ui.cameraVisible('ortega', false);
+  ui.cameraVisible('tvhill', false);
   await ui.resolveData('state'); ui.flush();
-  assert.deepEqual(requests().map(r => r.url), ['./cameras/gibraltar.json', './cameras/tvhill.json']);
-  ui.cameraVisible('ortega', true); ui.flush();
-  assert.equal(requests().length, 3);
+  assert.deepEqual(requests().map(r => r.url), ['./cameras/gibraltar.json']);
+  ui.cameraVisible('tvhill', true); ui.flush();
+  assert.equal(requests().length, 2);
   const first = [...requests()];
   ui.imperialBtn.emit('click');
   assert.ok(first.every(r => r.options.signal.aborted));
-  ui.flush(); assert.equal(requests().length, 3);
-  ui.chart.loaded(); ui.flush(); assert.equal(requests().length, 6);
+  ui.flush(); assert.equal(requests().length, 2);
+  ui.chart.loaded(); ui.flush(); assert.equal(requests().length, 4);
 });
 
 test('camera images are one small local fetch; stale frames are labeled and no automatic image polling occurs', async () => {

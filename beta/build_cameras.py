@@ -16,11 +16,10 @@ from PIL import Image, ImageDraw, ImageFont
 API = "https://api.cdn.prod.alertwest.com/api/panorama/list/byCamId"
 IMAGES = "https://img.cdn.prod.alertwest.com/data/img"
 PACIFIC = ZoneInfo("America/Los_Angeles")
-VERSION = 1
+VERSION = 2
 CAMERAS = {
     "gibraltar": ("1985", "Gibraltar_1", 180, 65.33, 600),
-    "tvhill": ("2748", "TV_Hill_2", 0, 360, 1200),
-    "ortega": ("2761", "Ortega_Ridge_1", 270, 360, 1200),
+    "tvhill": ("2748", "TV_Hill_2", 30, 120, 1200),
 }
 
 
@@ -91,21 +90,22 @@ def render(raw, metadata, key):
         if source.format != "JPEG" or source.width * source.height > 16_000_000:
             raise ValueError("Invalid camera image")
         view = direction_view(source, metadata["azimuth"], metadata["fov"], center, span, width)
-    # Match the satellite's timestamp strip; bearings help read a 360° panorama.
-    top, bottom = 28, 20 if span == 360 else 0
+    # Match the satellite timestamp strip and label the cropped panorama bearings.
+    top, bottom = 28, 20 if key == "tvhill" else 0
     output = Image.new("RGB", (width, view.height + top + bottom), "white")
     output.paste(view, (0, top))
     draw = ImageDraw.Draw(output)
     observed = datetime.fromisoformat(metadata["observed_at"].replace("Z", "+00:00"))
     draw.text((4, 4), observed.astimezone(PACIFIC).strftime("%b %d %H:%M %Z"),
               font=ImageFont.load_default(size=17), fill="#222222")
-    if span == 360:
-        names = ["N", "NE", "E", "SE", "S", "SW", "W", "NW"]
-        for i in range(9):
-            bearing = (center - 180 + 45 * i) % 360
-            x = min(width - 20, max(4, round(i * width / 8) - 8))
-            draw.text((x, top + view.height + 2), names[int(bearing / 45)],
-                      font=ImageFont.load_default(size=14), fill="#333333")
+    if key == "tvhill":
+        for i in range(5):
+            bearing = round(center - span / 2 + span * i / 4) % 360
+            label = f"{bearing:03d}°" + ({0: " N", 90: " E"}.get(bearing, ""))
+            text_font = ImageFont.load_default(size=14)
+            text_width = draw.textlength(label, font=text_font)
+            x = min(width - text_width - 4, max(4, i * width / 4 - text_width / 2))
+            draw.text((x, top + view.height + 2), label, font=text_font, fill="#333333")
     encoded = io.BytesIO()
     output.save(encoded, format="JPEG", quality=83, optimize=True, progressive=True)
     return encoded.getvalue(), output.size

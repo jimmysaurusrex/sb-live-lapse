@@ -60,7 +60,7 @@ sudo -u sb-live-lapse flock -w 90 "${beta_root}/.satellite.lock" \
 sudo -u sb-live-lapse flock -w 90 "${beta_root}/.cameras.lock" \
     "${code_root}/satellite-venv/bin/python" "${source_dir}/build_cameras.py" \
     --output-dir "${beta_root}/cameras"
-for camera in gibraltar tvhill ortega; do test -s "${beta_root}/cameras/${camera}.json"; done
+for camera in gibraltar tvhill; do test -s "${beta_root}/cameras/${camera}.json"; done
 
 # Validate a candidate config first. Apart from one /beta-only import, the
 # existing site's configuration remains byte-for-byte identical.
