@@ -27,10 +27,10 @@ jobs:
       - name: Install satellite rendering dependency
         run: python3 -m pip install -r satellite/requirements.txt
 
-      - name: Test station feeds and satellite rendering
+      - name: Test station feeds and image rendering
         run: python3 -m unittest discover -s tests -v
 
-      - name: Test chart controls and deferred satellite loading
+      - name: Test chart controls and deferred image loading
         run: node --test tests/test_*.cjs
 
       - name: Check deployment scripts
@@ -170,6 +170,11 @@ jobs:
         timeout-minutes: 2
         run: python3 satellite/build_satellite.py --output-dir satellite-output
 
+      - name: Build optional camera views for Pages
+        continue-on-error: true
+        timeout-minutes: 2
+        run: python3 cameras/build_cameras.py --output-dir camera-output
+
       - name: Prepare site artifact
         run: |
           mkdir -p site
@@ -185,6 +190,7 @@ jobs:
           cp station_history.json site/
           if [ -d snapshots ]; then cp -R snapshots site/; fi
           if [ -f satellite-output/latest.json ]; then cp -R satellite-output site/satellite; fi
+          if [ -d camera-output ]; then cp -R camera-output site/cameras; fi
 
       - uses: actions/upload-pages-artifact@v4
         with:

@@ -81,3 +81,13 @@ independently of station fetching; chart publishing adds a link to
 still only after its chart/data finish loading, and downloads a loop only on tap.
 See [satellite/README.md](../../satellite/README.md) for source and rendering details.
 The separate beta route, satellite data, and timers remain unchanged.
+
+## Camera imagery
+
+The same image-runtime setup also installs `sb-live-lapse-cameras.service` and
+`.timer`, with an independent cache in `/srv/sb-live-lapse/cameras`. Gibraltar 2's
+tight image sits beside GOES, with the TV Hill 330°–090° crop below. Both wait for
+the selected chart and its data to finish loading. Setup requires the expected
+camera IDs and render format before the first publish. Subsequent camera outages
+retain their timestamped last good views without blocking weather refreshes.
+See [cameras/README.md](../../cameras/README.md) for source and operational details.

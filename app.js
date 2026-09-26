@@ -17,14 +17,17 @@
   window.location.replace(target);
 })();
 
-function createSatelliteLoader(chart, dataReady) {
-  var section = document.getElementById("satelliteSection");
+function createDeferredImageLoader(chart, dataReady, camera) {
+  var prefix = camera || "satellite";
+  var label = camera ? "camera image" : "satellite image";
+  var folder = camera ? "./cameras/" : "./satellite/";
+  var section = document.getElementById(prefix + "Section");
   if (!section) return { pause: function () {}, schedule: function () {} };
-  var image = document.getElementById("satelliteImage");
-  var status = document.getElementById("satelliteStatus");
-  var button = document.getElementById("loadSatellite");
-  var loopButton = document.getElementById("playSatellite");
-  var caption = document.getElementById("satelliteCaption");
+  var image = document.getElementById(prefix + "Image");
+  var status = document.getElementById(prefix + "Status");
+  var button = document.getElementById(camera ? camera + "Load" : "loadSatellite");
+  var loopButton = camera ? null : document.getElementById("playSatellite");
+  var caption = document.getElementById(prefix + "Caption");
   var connection = navigator.connection;
   var pageLoaded = document.readyState === "complete";
   var visible = false, requested = false, finished = false, failed = false;
@@ -50,6 +53,13 @@ function createSatelliteLoader(chart, dataReady) {
     var minutes = Math.max(0, Math.floor((Date.now() - observed.getTime()) / 60000));
     var when = new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", hour: "2-digit",
       minute: "2-digit", hourCycle: "h23", timeZone: "America/Los_Angeles", timeZoneName: "short" }).format(observed);
+    if (camera) {
+      if (!finished) return;
+      caption.textContent = "Latest camera image: " + when + " · " + minutes + " min old";
+      status.textContent = minutes > 15 ? "Delayed · " + minutes + " min old" : "";
+      status.hidden = minutes <= 15;
+      return;
+    }
     caption.textContent = "Latest scan: " + when + " · " + (manifest.mode === "visible" ? "Visible" : "Night low clouds") +
       " · " + minutes + " min old" + (minutes > 30 ? " — delayed" : "") +
       (manifest.twilight ? " · Twilight: reduced reliability" : "");
@@ -58,12 +68,14 @@ function createSatelliteLoader(chart, dataReady) {
   function schedule() {
     button.hidden = finished || (!failed && !conserveData() && "IntersectionObserver" in window);
     button.disabled = !coreReady() || !!active;
-    loopButton.hidden = !finished || !manifest || !manifest.loop;
-    loopButton.disabled = !coreReady() || !!active;
-    loopButton.textContent = playing ? "Stop loop" : "Play last hour";
-    loopButton.title = manifest && manifest.loop ? "Download: " + Math.ceil(manifest.loop_bytes / 1024) + " KB" : "";
+    if (loopButton) {
+      loopButton.hidden = !finished || !manifest || !manifest.loop;
+      loopButton.disabled = !coreReady() || !!active;
+      loopButton.textContent = playing ? "Stop loop" : "Play last hour";
+      loopButton.title = manifest && manifest.loop ? "Download: " + Math.ceil(manifest.loop_bytes / 1024) + " KB" : "";
+    }
     if (!finished && !active && !failed) {
-      status.textContent = !requested && conserveData() ? "Satellite image paused to save data. Tap to load." : waitingText;
+      status.textContent = !requested && conserveData() ? "Image paused to save data. Tap to load." : waitingText;
     }
     if (timer !== null || !eligible()) return;
     timer = setTimeout(function () {
@@ -94,8 +106,10 @@ function createSatelliteLoader(chart, dataReady) {
     scheduleButtonsOnly();
   }
   function scheduleButtonsOnly() {
-    loopButton.disabled = true;
-    loopButton.textContent = "Play last hour";
+    if (loopButton) {
+      loopButton.disabled = true;
+      loopButton.textContent = "Play last hour";
+    }
   }
   function failure(isLoop) {
     active = null;
@@ -107,12 +121,19 @@ function createSatelliteLoader(chart, dataReady) {
       failed = true;
       requested = false;
       image.hidden = true;
-      status.textContent = "Satellite image unavailable. Tap Retry to try again.";
-      button.textContent = "Retry satellite image";
+      status.textContent = "Image unavailable. Tap Retry to try again.";
+      button.textContent = "Retry " + label;
     }
     schedule();
   }
   function validManifest(data) {
+    if (camera) {
+      var filename = new RegExp("^" + camera + "-\\d{10}-v\\d+\\.jpg$");
+      if (!data || !filename.test(data.image) || !Number.isFinite(new Date(data.observed_at).getTime())) {
+        throw new Error("Invalid camera metadata");
+      }
+      return data;
+    }
     if (!data || !/^\d{14}-(visible|night)-v\d+\.jpg$/.test(data.image) ||
         !Number.isFinite(new Date(data.observed_at).getTime()) || !/^(visible|night)$/.test(data.mode)) {
       throw new Error("Invalid satellite metadata");
@@ -135,24 +156,25 @@ function createSatelliteLoader(chart, dataReady) {
     }
     var request = new AbortController();
     active = request;
-    button.disabled = loopButton.disabled = true;
+    button.disabled = true;
+    if (loopButton) loopButton.disabled = true;
     status.hidden = false;
-    status.textContent = isLoop ? "Loading last hour…" : "Loading satellite image…";
+    status.textContent = isLoop ? "Loading last hour…" : "Loading " + label + "…";
     var options = { signal: request.signal, priority: "low", cache: "no-cache", credentials: "omit", referrerPolicy: "no-referrer" };
     // Both metadata and imagery wait for the chart, its data, window load and viewport.
-    var metadata = isLoop ? Promise.resolve(manifest) : fetch("./satellite/latest.json", options).then(function (response) {
-      if (!response.ok) throw new Error("Satellite metadata unavailable");
+    var metadata = isLoop ? Promise.resolve(manifest) : fetch(folder + (camera ? camera + ".json" : "latest.json"), options).then(function (response) {
+      if (!response.ok) throw new Error("Image metadata unavailable");
       return response.json();
     }).then(validManifest);
     metadata.then(function (data) {
       if (active !== request) return null;
       manifest = data;
-      return fetch("./satellite/" + (isLoop ? data.loop : data.image), options);
+      return fetch(folder + (isLoop ? data.loop : data.image), options);
     }).then(function (response) {
       if (active !== request) return null;
       var type = isLoop ? "image/gif" : "image/jpeg";
       if (!response.ok || (response.headers.get("content-type") || "").split(";")[0] !== type) {
-        throw new Error("Satellite image unavailable");
+        throw new Error("Image unavailable");
       }
       return response.blob();
     }).then(function (blob) {
@@ -187,7 +209,7 @@ function createSatelliteLoader(chart, dataReady) {
     }).catch(function () { if (active === request) failure(isLoop); });
   }
   button.addEventListener("click", function () { requested = true; schedule(); });
-  loopButton.addEventListener("click", function () {
+  if (loopButton) loopButton.addEventListener("click", function () {
     if (playing) stopLoop();
     else if (finished && manifest && manifest.loop) loopRequested = true;
     schedule();
@@ -230,7 +252,13 @@ function createSatelliteLoader(chart, dataReady) {
 
   var historySettled = false;
   var latestStateSettled = false;
-  var satellite = createSatelliteLoader(img, function () { return historySettled && latestStateSettled; });
+  var imagery = [null, "gibraltar", "tvhill"].map(function (camera) {
+    return createDeferredImageLoader(img, function () { return historySettled && latestStateSettled; }, camera);
+  });
+  var satellite = {
+    pause: function () { imagery.forEach(function (loader) { loader.pause(); }); },
+    schedule: function () { imagery.forEach(function (loader) { loader.schedule(); }); }
+  };
   var storageKey = "sb_units";
   var snapshotPathRe = /^snapshots\/\d{8}T\d{4}Z_(metric|imperial)\.svg$/;
   var latestSources = {

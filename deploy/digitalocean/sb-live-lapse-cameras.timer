@@ -1,0 +1,10 @@
+[Unit]
+Description=Refresh Santa Barbara camera views every two minutes
+
+[Timer]
+OnCalendar=*-*-* *:1/2:00
+RandomizedDelaySec=10
+Persistent=true
+
+[Install]
+WantedBy=timers.target

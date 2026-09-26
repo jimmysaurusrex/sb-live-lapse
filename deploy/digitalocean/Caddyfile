@@ -2,7 +2,7 @@ __SITE_ADDRESS__ {
 	root * __PUBLISH_ROOT__/current
 	encode zstd gzip
 
-	@live path /station_state.json /station_history.json /sba_wwtemp_chart.svg /sba_wwtemp_chart_metric.svg /sba_wwtemp_chart_imperial.svg /healthz.json /snapshots/* /satellite/latest.json
+	@live path /station_state.json /station_history.json /sba_wwtemp_chart.svg /sba_wwtemp_chart_metric.svg /sba_wwtemp_chart_imperial.svg /healthz.json /snapshots/* /satellite/latest.json /cameras/*.json
 	header @live Cache-Control "no-store"
 
 	@html path / /index.html /faq.html

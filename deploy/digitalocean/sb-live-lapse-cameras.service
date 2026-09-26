@@ -1,0 +1,33 @@
+[Unit]
+Description=Refresh Santa Barbara camera views
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=oneshot
+User=sb-live-lapse
+Group=sb-live-lapse
+EnvironmentFile=-/etc/sb-live-lapse.env
+ExecStart=/bin/bash /opt/sb-live-lapse/repo/deploy/digitalocean/run-cameras.sh
+TimeoutStartSec=90
+Nice=19
+IOSchedulingClass=idle
+MemoryMax=256M
+CPUQuota=25%
+UMask=0022
+NoNewPrivileges=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectClock=true
+ProtectControlGroups=true
+ProtectKernelLogs=true
+ProtectKernelModules=true
+ProtectKernelTunables=true
+RestrictSUIDSGID=true
+LockPersonality=true
+SystemCallArchitectures=native
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+CapabilityBoundingSet=
+ReadWritePaths=/srv/sb-live-lapse/cameras

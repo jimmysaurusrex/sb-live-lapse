@@ -7,3 +7,7 @@ sba_wwtemp_chart_imperial.svg
 station_state.json
 station_history.json
 snapshots/
+
+# Optional Pages image builds
+satellite-output/
+camera-output/

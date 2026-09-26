@@ -32,3 +32,8 @@ install -m 0644 "${REPO_DIR}/deploy/digitalocean/sb-live-lapse-satellite.service
 install -m 0644 "${REPO_DIR}/deploy/digitalocean/sb-live-lapse-satellite.timer" /etc/systemd/system/
 systemctl daemon-reload
 systemctl enable --now sb-live-lapse-satellite.timer
+
+# Camera views share the Pillow runtime and must exist before publishing the page.
+# Keep this call in the established setup entry point so first-time promotions
+# also work when deploy.sh started from the previous checkout before git pull.
+bash "${REPO_DIR}/deploy/digitalocean/setup-cameras.sh"

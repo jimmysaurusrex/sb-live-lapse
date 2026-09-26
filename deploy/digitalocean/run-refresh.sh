@@ -44,8 +44,9 @@ for path in "${files[@]}"; do
 done
 
 # Shared generated imagery survives atomic chart releases. The independent
-# satellite service owns its updates; chart refreshes do not fetch satellite data.
+# imagery services own their updates; chart refreshes do not fetch image data.
 ln -s "${PUBLISH_ROOT}/satellite" "${stage_dir}/satellite"
+ln -s "${PUBLISH_ROOT}/cameras" "${stage_dir}/cameras"
 
 if [ -d snapshots ]; then
   cp -R snapshots "${stage_dir}/snapshots"
