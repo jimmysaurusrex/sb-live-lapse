@@ -71,20 +71,22 @@ good output on upstream failure. The displayed scan time remains unchanged; its 
 Only generated satellite artifacts older than 24 hours are pruned. Attribution
 and projection details are recorded in `data/README.md`.
 
-The camera grid has two rows: GOES alongside a tight Gibraltar 1 south-facing
-crop (1985), then a TV Hill 2 panorama cropped from 330° through north to 090°
-(2748). The TV Hill crop spans 120°, centered on 030°, with bearing labels.
-Ortega has been removed from the page and refresh job. Gibraltar's live tight
-camera can rotate, so its south view uses the corresponding pixels from the most
-recent panorama. The public panorama API supplies the midpoint azimuth and angular
-width; redundant edge overlap is trimmed when the crop crosses north. No physical
-camera controls are used.
+The camera grid has two rows: GOES alongside the latest tight Gibraltar 2 image
+(1986), then a TV Hill 2 panorama cropped from 330° through north to 090° (2748).
+The TV Hill crop spans 120°, centered on 030°, with bearing labels. Ortega has been
+removed from the page and refresh job. Gibraltar 2 uses its actual single tight
+shot, resized without changing its field of view; the actual bearing is printed
+beside its Pacific timestamp because the camera can move. Its current heading is
+approximately south. No physical camera controls are used.
 
-`build_cameras.py` fetches public ALERTCalifornia/UC San Diego panorama metadata
-from `https://api.cdn.prod.alertwest.com/api/panorama/list/byCamId?camId=ID&timestamp=`
-and JPEGs from `https://img.cdn.prod.alertwest.com/data/img/`. It produces 600px
-Gibraltar and 1200px panoramas, with Pacific timestamps (~90 KB total in the first
-preview). The cache updates every two minutes in an independent beta-only service.
+`build_cameras.py` fetches public ALERTCalifornia/UC San Diego metadata from
+`https://api.cdn.prod.alertwest.com/api/getCameraDataByLoc` for Gibraltar 2 and
+`https://api.cdn.prod.alertwest.com/api/panorama/list/byCamId?camId=2748&timestamp=`
+for TV Hill. JPEGs come from `https://img.cdn.prod.alertwest.com/data/img/`.
+All upstream traffic stays on the server, which requests gzip-compressed metadata.
+The browser downloads only a 600px tight view and 1200px panorama crop with Pacific
+timestamps. The panorama API supplies midpoint azimuth and angular width; the crop
+wraps at north. The cache updates every two minutes in an independent beta service.
 Each view uses the same chart-first, viewport-only, abortable loader as GOES,
 with no automatic browser refresh. Feed failures preserve the last good image;
 a camera older than 15 minutes displays a compact delay label. Titles link to
@@ -138,7 +140,8 @@ invoke the primary deployment or grant its CI account new privileges.
 - Camera service/timer: `sb-live-lapse-beta-cameras.service` / `.timer`, every two
   minutes, 90-second limit, 25% CPU, 256 MB RAM; outputs in
   `/srv/sb-live-lapse-beta/cameras`. Uses the beta Pillow environment. Publishing
-  requires both cached views before switching the beta web release.
+  requires both cached views with the expected camera IDs and render version before
+  switching the beta web release.
 - Caddy: `/etc/caddy/sb-live-lapse-beta.caddy`, imported by the existing Caddyfile.
   Configuration backups are in `/opt/sb-live-lapse-beta/config-backups`.
 

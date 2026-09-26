@@ -55,7 +55,7 @@ function createDeferredImageLoader(chart, dataReady, camera) {
       minute: "2-digit", hourCycle: "h23", timeZone: "America/Los_Angeles", timeZoneName: "short" }).format(observed);
     if (camera) {
       if (!finished) return;
-      caption.textContent = "Latest camera panorama: " + when + " · " + minutes + " min old";
+      caption.textContent = "Latest camera image: " + when + " · " + minutes + " min old";
       status.textContent = minutes > 15 ? "Delayed · " + minutes + " min old" : "";
       status.hidden = minutes <= 15;
       return;

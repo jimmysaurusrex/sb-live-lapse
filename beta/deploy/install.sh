@@ -57,10 +57,25 @@ sudo -u sb-live-lapse flock -w 90 "${beta_root}/.satellite.lock" \
     --output-dir "${beta_root}/satellite"
 
 # Camera rendering is isolated from both chart generation and satellite refresh.
-sudo -u sb-live-lapse flock -w 90 "${beta_root}/.cameras.lock" \
-    "${code_root}/satellite-venv/bin/python" "${source_dir}/build_cameras.py" \
+# Hold the camera lock until this installer exits, including the code/web swap,
+# so the previous timer cannot republish the old camera identity during rollout.
+touch "${beta_root}/.cameras.lock"
+chown sb-live-lapse:sb-live-lapse "${beta_root}/.cameras.lock"
+exec 8>"${beta_root}/.cameras.lock"
+flock -w 90 8
+sudo -u sb-live-lapse "${code_root}/satellite-venv/bin/python" "${source_dir}/build_cameras.py" \
     --output-dir "${beta_root}/cameras"
-for camera in gibraltar tvhill; do test -s "${beta_root}/cameras/${camera}.json"; done
+"${code_root}/satellite-venv/bin/python" - "${source_dir}" "${beta_root}/cameras" <<'PYVERIFY'
+import json, runpy, sys
+from pathlib import Path
+source, output = map(Path, sys.argv[1:])
+config = runpy.run_path(str(source / 'build_cameras.py'))
+for key, (camera_id, *_) in config['CAMERAS'].items():
+    metadata = json.loads((output / f'{key}.json').read_text())
+    assert metadata['camera_id'] == camera_id, f'{key}: wrong camera cached'
+    assert metadata['render_version'] == config['VERSION'], f'{key}: old image format'
+    assert (output / metadata['image']).is_file(), f'{key}: image missing'
+PYVERIFY
 
 # Validate a candidate config first. Apart from one /beta-only import, the
 # existing site's configuration remains byte-for-byte identical.
