@@ -30,13 +30,14 @@ if ! "${code_root}/satellite-venv/bin/python" -m pip --version >/dev/null 2>&1; 
 fi
 "${code_root}/satellite-venv/bin/python" -m pip install --disable-pip-version-check \
     --require-virtualenv -r "${source_dir}/requirements-satellite.txt"
-install -d -o sb-live-lapse -g sb-live-lapse "${beta_root}/satellite"
+install -d -o sb-live-lapse -g sb-live-lapse "${beta_root}/satellite" "${beta_root}/cameras"
 stage="${beta_root}/releases/${revision}"
 install -d -o sb-live-lapse -g sb-live-lapse "$stage"
 for asset in index.html styles.css app.js; do
     install -m 0644 "${source_dir}/${asset}" "${stage}/${asset}"
 done
 ln -sfn ../../satellite "${stage}/satellite"
+ln -sfn ../../cameras "${stage}/cameras"
 for artifact in station_state.json station_history.json sba_wwtemp_chart.svg sba_wwtemp_chart_metric.svg sba_wwtemp_chart_imperial.svg snapshots; do
     ln -sfn "../../chart-data/${artifact}" "${stage}/${artifact}"
 done
@@ -54,6 +55,12 @@ PY
 sudo -u sb-live-lapse flock -w 90 "${beta_root}/.satellite.lock" \
     "${code_root}/satellite-venv/bin/python" "${source_dir}/build_satellite.py" \
     --output-dir "${beta_root}/satellite"
+
+# Camera rendering is isolated from both chart generation and satellite refresh.
+sudo -u sb-live-lapse flock -w 90 "${beta_root}/.cameras.lock" \
+    "${code_root}/satellite-venv/bin/python" "${source_dir}/build_cameras.py" \
+    --output-dir "${beta_root}/cameras"
+for camera in gibraltar tvhill ortega; do test -s "${beta_root}/cameras/${camera}.json"; done
 
 # Validate a candidate config first. Apart from one /beta-only import, the
 # existing site's configuration remains byte-for-byte identical.
@@ -100,9 +107,12 @@ install -m 0644 "${source_dir}/deploy/sb-live-lapse-beta.service" /etc/systemd/s
 install -m 0644 "${source_dir}/deploy/sb-live-lapse-beta.timer" /etc/systemd/system/
 install -m 0644 "${source_dir}/deploy/sb-live-lapse-beta-satellite.service" /etc/systemd/system/
 install -m 0644 "${source_dir}/deploy/sb-live-lapse-beta-satellite.timer" /etc/systemd/system/
+install -m 0644 "${source_dir}/deploy/sb-live-lapse-beta-cameras.service" /etc/systemd/system/
+install -m 0644 "${source_dir}/deploy/sb-live-lapse-beta-cameras.timer" /etc/systemd/system/
 systemctl daemon-reload
 systemctl enable --now sb-live-lapse-beta.timer
 systemctl enable --now sb-live-lapse-beta-satellite.timer
+systemctl enable --now sb-live-lapse-beta-cameras.timer
 systemctl start sb-live-lapse-beta.service
 test "$primary_hash" = "$(sha256sum "${primary_root}/index.html" "${primary_root}/app.js" "${primary_root}/styles.css")"
 systemctl is-active --quiet sb-live-lapse-refresh.timer

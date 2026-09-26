@@ -33,9 +33,12 @@ class Element {
   removeAttribute(name) { delete this.attributes[name]; if (name === 'src') this._src = undefined; }
 }
 
-function setup(connection = {}, observerSupported = true) {
+function setup(connection = {}, observerSupported = true, cameras = false) {
   const ids = ['chart', 'chartTitle', 'metricBtn', 'imperialBtn', 'prevSnapshotBtn', 'nextSnapshotBtn',
     'snapshotDay', 'snapshotTime', 'satelliteSection', 'satelliteImage', 'satelliteStatus', 'loadSatellite', 'playSatellite', 'satelliteCaption'];
+  if (cameras) for (const key of ['gibraltar', 'tvhill', 'ortega']) {
+    ids.push(...['Section', 'Image', 'Status', 'Load', 'Caption'].map(suffix => key + suffix));
+  }
   const elements = Object.fromEntries(ids.map(id => [id, new Element()]));
   const document = Object.assign(new Element(), {
     readyState: 'interactive', visibilityState: 'visible',
@@ -43,9 +46,13 @@ function setup(connection = {}, observerSupported = true) {
   });
   const window = Object.assign(new Element(), { location: { hostname: 'localhost' } });
   let intersection;
+  const intersections = new Map();
   class Observer {
-    constructor(callback) { intersection = callback; }
-    observe() {}
+    constructor(callback) { this.callback = callback; }
+    observe(element) {
+      intersections.set(element, this.callback);
+      if (element === elements.satelliteSection) intersection = this.callback;
+    }
   }
   if (observerSupported) window.IntersectionObserver = Observer;
   const requests = [], timers = new Map(), revoked = [];
@@ -95,6 +102,7 @@ function setup(connection = {}, observerSupported = true) {
   }
   return { ...elements, window, document, requests, satelliteRequests, flush, resolveData, ready, revoked,
     resolveManifest, resolveImage, loaded,
+    cameraVisible(key, value) { intersections.get(elements[key + 'Section'])?.([{ isIntersecting: value }]); },
     visible(value) { intersection?.([{ isIntersecting: value }]); } };
 }
 
@@ -290,4 +298,65 @@ test('hidden tabs pause downloads until visible again', async () => {
   ui.document.emit('visibilitychange');
   ui.flush();
   assert.equal(ui.satelliteRequests().length, 2);
+});
+
+
+test('all camera images have no eager source and follow the requested three-row order', () => {
+  for (const key of ['gibraltar', 'tvhill', 'ortega']) {
+    const tag = html.match(new RegExp('<img id="' + key + 'Image"[\\s\\S]*?>'))[0];
+    assert.doesNotMatch(tag, /\s(?:src|srcset)\s*=/);
+  }
+  const ids = ['chart', 'satelliteSection', 'gibraltarSection', 'tvhillSection', 'ortegaSection'];
+  const positions = ids.map(id => html.indexOf('id="' + id + '"'));
+  assert.deepEqual(positions, [...positions].sort((a, b) => a - b));
+});
+
+test('each camera waits for page, chart, both data requests and its own viewport; navigation aborts all feeds', async () => {
+  const ui = setup({}, true, true);
+  for (const key of ['gibraltar', 'tvhill', 'ortega']) ui.cameraVisible(key, true);
+  const requests = () => ui.requests.filter(r => r.url.startsWith('./cameras/'));
+  ui.flush(); assert.equal(requests().length, 0);
+  await ui.resolveData('history');
+  ui.chart.loaded(); ui.window.emit('load'); ui.flush();
+  assert.equal(requests().length, 0);
+  ui.cameraVisible('ortega', false);
+  await ui.resolveData('state'); ui.flush();
+  assert.deepEqual(requests().map(r => r.url), ['./cameras/gibraltar.json', './cameras/tvhill.json']);
+  ui.cameraVisible('ortega', true); ui.flush();
+  assert.equal(requests().length, 3);
+  const first = [...requests()];
+  ui.imperialBtn.emit('click');
+  assert.ok(first.every(r => r.options.signal.aborted));
+  ui.flush(); assert.equal(requests().length, 3);
+  ui.chart.loaded(); ui.flush(); assert.equal(requests().length, 6);
+});
+
+test('camera images are one small local fetch; stale frames are labeled and no automatic image polling occurs', async () => {
+  const ui = setup({}, true, true);
+  await ui.ready(); ui.cameraVisible('gibraltar', true); ui.flush();
+  const request = ui.requests.find(r => r.url === './cameras/gibraltar.json');
+  request.resolve({ ok: true, json: async () => ({ image: 'gibraltar-1790386900-v1.jpg', observed_at: '2020-01-01T00:00:00Z' }) });
+  await tick();
+  const body = ui.requests.at(-1);
+  assert.equal(body.url, './cameras/gibraltar-1790386900-v1.jpg');
+  assert.equal(body.options.priority, 'low');
+  body.resolve({ ok: true, headers: { get: () => 'image/jpeg' }, blob: async () => ({}) });
+  await tick(); ui.gibraltarImage.loaded();
+  assert.equal(ui.gibraltarImage.hidden, false);
+  assert.equal(ui.gibraltarStatus.hidden, false);
+  assert.match(ui.gibraltarStatus.textContent, /Delayed/);
+  ui.flush(); ui.cameraVisible('gibraltar', true); ui.flush();
+  assert.equal(ui.requests.filter(r => r.url.startsWith('./cameras/')).length, 2);
+});
+
+test('camera save-data mode requires a tap and rejects paths outside its own feed', async () => {
+  const ui = setup({ saveData: true }, true, true);
+  await ui.ready(); ui.cameraVisible('tvhill', true); ui.flush();
+  assert.equal(ui.requests.filter(r => r.url.startsWith('./cameras/')).length, 0);
+  assert.equal(ui.tvhillLoad.hidden, false);
+  ui.tvhillLoad.emit('click'); ui.flush();
+  ui.requests.at(-1).resolve({ ok: true, json: async () => ({ image: '../app.js', observed_at: '2026-09-26T01:00:00Z' }) });
+  await tick();
+  assert.equal(ui.requests.filter(r => r.url.startsWith('./cameras/')).length, 1);
+  assert.equal(ui.tvhillLoad.textContent, 'Retry camera image');
 });

@@ -66,7 +66,15 @@ body {
   height: auto;
 }
 
-.satellite-section { max-width: 600px; margin-top: 16px; font-size: 13px; }
+.imagery-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px 16px; max-width: 1180px; margin-top: 16px; align-items: start; }
+.satellite-section, .camera-section { min-width: 0; font-size: 13px; }
+.panorama-section { grid-column: 1 / -1; }
+.camera-section h2 { font-size: 14px; margin: 0 0 6px; }
+.camera-section h2 a { color: inherit; text-decoration: none; }
+.camera-section h2 a:hover { text-decoration: underline; }
+.camera-section img { width: 100%; height: auto; margin-top: 8px; }
+.camera-section .camera-status { margin: 4px 0; color: #555; }
+.camera-section button { margin: 4px 0; }
 .satellite-section h2 { font-size: 14px; margin: 0 0 6px; }
 .satellite-section p { margin: 6px 0; }
 #satelliteImage { max-width: 100%; height: auto; margin-top: 8px; }

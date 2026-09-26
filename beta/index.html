@@ -40,6 +40,7 @@
     >Is today a good day to fly?</a>
   </div>
   <img id="chart" src="./sba_wwtemp_chart_metric.svg" alt="Santa Barbara lapse chart" />
+  <div class="imagery-grid">
   <section id="satelliteSection" class="satellite-section" aria-labelledby="satelliteHeading">
     <h2 id="satelliteHeading">GOES-WEST - Painted Cave to Rincon</h2>
     <p id="satelliteCaption" hidden></p>
@@ -50,5 +51,33 @@
       alt="GOES-West cloud imagery from Painted Cave to Rincon, with the coastline and Santa Barbara and Carpinteria marked. North is up; scan time is printed on each frame." hidden />
     <button id="playSatellite" class="control-button" type="button" disabled hidden>Play last hour</button>
   </section>
+  <section id="gibraltarSection" class="camera-section" aria-labelledby="gibraltarHeading">
+    <h2 id="gibraltarHeading"><a href="https://ops.alertcalifornia.org/cam-console/1985" target="_blank" rel="noopener noreferrer" title="ALERTCalifornia | UC San Diego">Gibraltar - South</a></h2>
+    <p id="gibraltarCaption" hidden></p>
+    <p id="gibraltarStatus" class="camera-status" role="status" hidden></p>
+    <button id="gibraltarLoad" class="control-button" type="button" disabled hidden>Load camera image</button>
+    <img id="gibraltarImage" width="600" height="366" decoding="async" fetchpriority="low"
+      aria-describedby="gibraltarCaption" title="ALERTCalifornia | UC San Diego"
+      alt="Tight south-facing crop from the latest Gibraltar 1 panorama." hidden />
+  </section>
+  <section id="tvhillSection" class="camera-section panorama-section" aria-labelledby="tvhillHeading">
+    <h2 id="tvhillHeading"><a href="https://ops.alertcalifornia.org/cam-console/2748" target="_blank" rel="noopener noreferrer" title="ALERTCalifornia | UC San Diego">TV Hill - North</a></h2>
+    <p id="tvhillCaption" hidden></p>
+    <p id="tvhillStatus" class="camera-status" role="status" hidden></p>
+    <button id="tvhillLoad" class="control-button" type="button" disabled hidden>Load camera image</button>
+    <img id="tvhillImage" width="1200" height="170" decoding="async" fetchpriority="low"
+      aria-describedby="tvhillCaption" title="ALERTCalifornia | UC San Diego"
+      alt="Full TV Hill 2 panorama centered north, with compass directions." hidden />
+  </section>
+  <section id="ortegaSection" class="camera-section panorama-section" aria-labelledby="ortegaHeading">
+    <h2 id="ortegaHeading"><a href="https://ops.alertcalifornia.org/cam-console/2761" target="_blank" rel="noopener noreferrer" title="ALERTCalifornia | UC San Diego">Ortega Ridge - West</a></h2>
+    <p id="ortegaCaption" hidden></p>
+    <p id="ortegaStatus" class="camera-status" role="status" hidden></p>
+    <button id="ortegaLoad" class="control-button" type="button" disabled hidden>Load camera image</button>
+    <img id="ortegaImage" width="1200" height="170" decoding="async" fetchpriority="low"
+      aria-describedby="ortegaCaption" title="ALERTCalifornia | UC San Diego"
+      alt="Full Ortega Ridge 1 panorama centered west, with compass directions." hidden />
+  </section>
+  </div>
 </body>
 </html>

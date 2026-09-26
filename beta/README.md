@@ -71,6 +71,25 @@ good output on upstream failure. The displayed scan time remains unchanged; its 
 Only generated satellite artifacts older than 24 hours are pruned. Attribution
 and projection details are recorded in `data/README.md`.
 
+The camera grid has three rows: GOES alongside a tight Gibraltar 1 south-facing
+crop (1985); a full TV Hill 2 panorama centered north (2748); and a full Ortega
+Ridge 1 panorama centered west (2761). Gibraltar's live tight camera can rotate,
+so its south view uses the corresponding pixels from the most recent panorama.
+The public panorama API supplies the midpoint azimuth and angular width; redundant
+edge overlap is trimmed and full panoramas wrap once around 360 degrees. Compass
+labels show their orientation. No physical camera controls are used.
+
+`build_cameras.py` fetches public ALERTCalifornia/UC San Diego panorama metadata
+from `https://api.cdn.prod.alertwest.com/api/panorama/list/byCamId?camId=ID&timestamp=`
+and JPEGs from `https://img.cdn.prod.alertwest.com/data/img/`. It produces 600px
+Gibraltar and 1200px panoramas, with Pacific timestamps (~90 KB total in the first
+preview). The cache updates every two minutes in an independent beta-only service.
+Each view uses the same chart-first, viewport-only, abortable loader as GOES,
+with no automatic browser refresh. Feed failures preserve the last good image;
+a camera older than 15 minutes displays a compact delay label. Titles link to
+ALERTCalifornia and image tooltips retain attribution. These views always show
+latest camera imagery, independently of the selected historical chart.
+
 ## Local preview and checks
 
 Satellite rendering requires Python 3.10 or newer.
@@ -83,6 +102,7 @@ node --test beta/tests/test_*.cjs
 python3 beta/build_charts.py --primary-dir /path/to/primary-release --output-dir beta/preview
 cp beta/index.html beta/app.js beta/styles.css beta/preview/
 python3 beta/build_satellite.py --output-dir beta/preview/satellite
+python3 beta/build_cameras.py --output-dir beta/preview/cameras
 python3 -m http.server 8765 --bind 127.0.0.1
 ```
 
@@ -114,6 +134,10 @@ invoke the primary deployment or grant its CI account new privileges.
   25% CPU quota, low CPU/I/O priority, 192 MB memory limit. Its Pillow dependency
   lives in `/opt/sb-live-lapse-beta/satellite-venv`; outputs in
   `/srv/sb-live-lapse-beta/satellite`. No main-site Python dependencies change.
+- Camera service/timer: `sb-live-lapse-beta-cameras.service` / `.timer`, every two
+  minutes, 90-second limit, 25% CPU, 256 MB RAM; outputs in
+  `/srv/sb-live-lapse-beta/cameras`. Uses the beta Pillow environment. Publishing
+  requires all three cached views before switching the beta web release.
 - Caddy: `/etc/caddy/sb-live-lapse-beta.caddy`, imported by the existing Caddyfile.
   Configuration backups are in `/opt/sb-live-lapse-beta/config-backups`.
 
