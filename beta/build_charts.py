@@ -9,7 +9,7 @@ import xml.etree.ElementTree as ET
 
 SVG = "{http://www.w3.org/2000/svg}"
 ET.register_namespace("", SVG[1:-1])
-NAMES = {"KC6OYN": "La Cumbre", "SE068": "VOR", "SE234": "AntFarm",
+NAMES = {"783SE": "La Cumbre", "SE068": "VOR", "SE234": "AntFarm",
          "MTIC1": "Montecito", "MPWC1": "SM Pass", "421SE": "Parma", "KSBA": "Airport"}
 SNAPSHOT_PATH = re.compile(r"^snapshots/\d{8}T\d{4}Z_(metric|imperial)\.svg$")
 
@@ -40,8 +40,11 @@ def temperature_pair(row, unit):
 
 def add_dew_points(svg, stations, unit):
     root = ET.fromstring(svg)
+    names = dict(NAMES)
+    if "KC6OYN" in stations and "783SE" not in stations:
+        names["KC6OYN"] = names.pop("783SE")
     rows = {key: {**stations.get(key, {}), "name": stations.get(key, {}).get("name") or name}
-            for key, name in NAMES.items()}
+            for key, name in names.items()}
     by_name = {row["name"]: row for row in rows.values()}
     label_right = float(root.get("viewBox").split()[2]) - 12
     elements = list(root)

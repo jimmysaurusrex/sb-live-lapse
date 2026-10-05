@@ -129,8 +129,8 @@ class MesoWestTests(unittest.TestCase):
             if Clock.current != NOW:
                 raise TimeoutError("total outage")
             if url.startswith(chart.MADIS_BASE):
-                if query["stanam"] == ["AV377"]:
-                    return '<mesonet><record var="V-T" shef_id="AV377" elev="820.96" ObTime="2026-09-19T14:57" provider="APRSWXNET" data_value="289.261108" /></mesonet>'
+                if query["stanam"] == ["783SE"]:
+                    return '<mesonet><record var="V-T" shef_id="783SE" elev="1161.5928" ObTime="2026-09-19T14:57" provider="SCE" data_value="289.261108" /></mesonet>'
                 return "<mesonet/>"
             if url.startswith(chart.MESOWEST_BASE):
                 return fixture(query["stn"][0])
@@ -156,7 +156,7 @@ class MesoWestTests(unittest.TestCase):
                     chart.main()
                     self.assertEqual(len(requests), 13)  # 7 MADIS, 6 MesoWest, no findU.
                     state = json.loads(chart.STATE_PATH.read_text())["stations"]
-                    for station_id in chart.MESOWEST_ELEV_M:
+                    for station_id in chart.MESOWEST_ELEV_M.keys() - {"783SE"}:
                         self.assertEqual(state[station_id]["temp_source"]["service"], "MesoWest")
                     for path in (chart.CHART_METRIC_PATH, chart.CHART_IMPERIAL_PATH):
                         root = ET.fromstring(path.read_text())

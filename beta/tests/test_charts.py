@@ -32,6 +32,19 @@ class DewPointChartsTests(unittest.TestCase):
         return {node[0].text: node[1].text.strip() for node in ET.fromstring(svg).findall(SVG + "text")
                 if node.get("class") == "station-label"}
 
+    def test_la_cumbre_labels_follow_each_snapshots_station_id(self):
+        for station_id, display_id in (("783SE", "783SE"), ("KC6OYN", "KC60YN")):
+            with self.subTest(station_id=station_id):
+                snapshot = copy.deepcopy(self.snapshot)
+                row = snapshot["stations"].pop("783SE")
+                row["id"] = station_id
+                snapshot["stations"][station_id] = row
+                for unit, source in zip(("metric", "imperial"), primary_chart.build_snapshot_svgs(snapshot)):
+                    result = add_dew_points(source, snapshot["stations"], unit)
+                    self.assertIn(f"La Cumbre ({display_id})", result)
+                    self.assertEqual(self.graph_labels(result)["La Cumbre"],
+                                     "68.0F/+14.4F" if unit == "imperial" else "20.0C/+8.0C")
+
     def test_both_units_pair_the_correct_station_and_preserve_weather_geometry(self):
         original_stations = copy.deepcopy(self.stations)
         for index, unit in enumerate(("metric", "imperial")):

@@ -17,7 +17,7 @@
     {name:'Montecito', z:1619, t:75.6, dir:120, mph:6, labelY:349, mobileY:298},
     {name:'AntFarm', z:2355, t:72, dir:240, mph:7, labelY:306, mobileY:266},
     {name:'VOR', z:3508, t:69, dir:235, mph:10, labelY:246, mobileY:228},
-    {name:'La Cumbre', z:3940, t:74, dir:230, mph:8, labelY:210, mobileY:192}
+    {name:'La Cumbre', z:3811, t:74, dir:230, mph:8, labelY:210, mobileY:192}
   ];
   var profile = [[1000,75],[1500,73],[2000,71],[2500,69],[3000,68],
     [3500,70],[4000,72],[4500,70],[5000,67],[5500,64],[6000,61],[6500,58]];

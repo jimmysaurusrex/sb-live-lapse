@@ -10,7 +10,7 @@ from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
 
-STATIONS = ["KC60YN", "SE068", "SE234", "MTIC1", "MPWC1", "421SE", "SE053", "KSBA"]
+STATIONS = ["783SE", "SE068", "SE234", "MTIC1", "MPWC1", "421SE", "SE053", "KSBA"]
 RASS_BASE = "https://downloads.psl.noaa.gov/psd2/data/realtime/Radar449/WwTemp/sba/"
 MADIS_BASE = "https://madis-data.ncep.noaa.gov/madisPublic/cgi-bin/madisXmlPublicDir"
 CHART_PATH = Path("/Users/james/vibe/RASStastic/sba_wwtemp_chart.svg")
