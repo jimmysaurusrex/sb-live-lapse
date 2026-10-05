@@ -17,8 +17,10 @@ from typing import Dict, List, Optional, Tuple
 from zoneinfo import ZoneInfo
 
 
-STATIONS = ["KC6OYN", "SE068", "SE234", "MTIC1", "MPWC1", "421SE", "KSBA"]
+STATIONS = ["783SE", "SE068", "SE234", "MTIC1", "MPWC1", "421SE", "KSBA"]
 STATION_NAMES = {
+    "783SE": "La Cumbre",
+    # Keep the retired station identity for historical chart rendering.
     "KC6OYN": "La Cumbre",
     "SE068": "VOR",
     "SE234": "AntFarm",
@@ -35,12 +37,14 @@ RASS_BASE = "https://downloads.psl.noaa.gov/psd2/data/realtime/Radar449/WwTemp/s
 MADIS_BASE = "https://madis-data.ncep.noaa.gov/madisPublic/cgi-bin/madisXmlPublicDir"
 CWOP_XML_BASE = "https://www.findu.com/cgi-bin/wxxml.cgi"
 MESOWEST_BASE = "https://mesowest.utah.edu/cgi-bin/droman/meso_table_mesodyn.cgi"
-# Existing MADIS elevations, retained when its response is empty. MesoWest's
-# observation table does not include station elevation.
+# Station elevations retained when MADIS is empty. MesoWest observation
+# tables omit elevation; 783SE is listed at 3811 ft (see README).
 MESOWEST_ELEV_M = {
+    "783SE": 1161.5928,
     "SE068": 1069.2, "SE234": 717.8, "MTIC1": 493.5,
     "MPWC1": 454.5, "421SE": 237.7, "KSBA": 3.0,
 }
+# Legacy CWOP support; none of the current STATIONS use findU.
 CWOP_STATIONS = {"KC6OYN"}
 # MADIS indexes this CWOP call sign by its assigned ID. See README for evidence.
 MADIS_STATION_IDS = {"KC6OYN": "AV377"}
@@ -65,6 +69,7 @@ KTS_PER_MPS = 1.94384
 PACIFIC = ZoneInfo("America/Los_Angeles")
 HTTP_USER_AGENT = "Mozilla/5.0 (compatible; sb-live-lapse/1.0)"
 STATION_ELEV_M = {
+    "783SE": 1161.5928,
     "KC6OYN": 1201.0,
 }
 LAST_GOOD_GRACE_MIN = 90.0
@@ -947,8 +952,11 @@ def snapshot_to_station_rows(snapshot: Dict) -> List[Dict]:
     if not isinstance(stations_map, dict):
         return []
 
+    # Rebuild older snapshots with the station that actually supplied them.
+    station_ids = ["KC6OYN" if sid == "783SE" and "783SE" not in stations_map
+                   and "KC6OYN" in stations_map else sid for sid in STATIONS]
     out: List[Dict] = []
-    for station_id in STATIONS:
+    for station_id in station_ids:
         raw = stations_map.get(station_id)
         if isinstance(raw, dict):
             out.append(normalize_state_row(station_id, raw))

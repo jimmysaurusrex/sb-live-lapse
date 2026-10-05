@@ -279,6 +279,7 @@ class ContinuityTests(unittest.TestCase):
                 self.assertEqual(row["recent"], recent)
                 self.assertEqual(chart.within_grace(timestamp, NOW), grace)
 
+    @patch.object(chart, "STATIONS", ["KC6OYN"])
     def test_cache_keeps_observation_time_and_provenance(self):
         original = chart.parse_station_madis("KC6OYN", MADIS, NOW)
         saved = json.dumps({"stations": {"KC6OYN": chart.station_payload(original)}})

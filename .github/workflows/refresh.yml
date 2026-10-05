@@ -83,8 +83,8 @@ jobs:
           STATE_URL="https://${GITHUB_REPOSITORY_OWNER}.github.io/${REPO_NAME}/station_state.json"
           HISTORY_URL="https://${GITHUB_REPOSITORY_OWNER}.github.io/${REPO_NAME}/station_history.json"
           MADIS_URL="https://madis-data.ncep.noaa.gov/madisPublic/cgi-bin/madisXmlPublicDir?time=0&minbck=-59&minfwd=0&recwin=3&timefilter=0&dfltrsel=3&stasel=1&stanam=SE068&pvdrsel=0&varsel=2&qctype=0&qcsel=1&xml=1&csvmiss=0"
-          CWOP_URL="https://www.findu.com/cgi-bin/wxxml.cgi?call=KC6OYN&last=2"
-          MADIS_KC6OYN_URL="https://madis-data.ncep.noaa.gov/madisPublic/cgi-bin/madisXmlPublicDir?time=0&minbck=-59&minfwd=0&recwin=3&timefilter=0&dfltrsel=3&stasel=1&stanam=AV377&pvdrsel=0&varsel=2&qctype=0&qcsel=1&xml=1&csvmiss=0"
+          MESOWEST_783SE_URL="https://mesowest.utah.edu/cgi-bin/droman/meso_table_mesodyn.cgi?stn=783SE&unit=1&time=GMT&past=0&order=1"
+          MADIS_783SE_URL="https://madis-data.ncep.noaa.gov/madisPublic/cgi-bin/madisXmlPublicDir?time=0&minbck=-59&minfwd=0&recwin=3&timefilter=0&dfltrsel=3&stasel=1&stanam=783SE&pvdrsel=0&varsel=2&qctype=0&qcsel=1&xml=1&csvmiss=0"
 
           probe_get() {
             name="$1"
@@ -116,8 +116,8 @@ jobs:
 
           probe_get "rass_root" "https://downloads.psl.noaa.gov/psd2/data/realtime/Radar449/WwTemp/sba/"
           probe_get "madis_se068" "${MADIS_URL}"
-          probe_get "cwop_kc6oyn" "${CWOP_URL}"
-          probe_get "madis_kc6oyn_av377" "${MADIS_KC6OYN_URL}"
+          probe_get "mesowest_783se" "${MESOWEST_783SE_URL}"
+          probe_get "madis_783se" "${MADIS_783SE_URL}"
           probe_get "deployed_state" "${STATE_URL}"
           probe_get "deployed_history" "${HISTORY_URL}"
 
@@ -132,10 +132,10 @@ jobs:
               text = madis_body.read_text(errors="ignore")
               checks.append(f"madis_has_record={'<record' in text}")
 
-          cwop_body = Path("diagnostics/cwop_kc6oyn.body")
-          if cwop_body.exists():
-              text = cwop_body.read_text(errors="ignore")
-              checks.append(f"cwop_has_weatherReport={'<weatherReport' in text}")
+          mesowest_body = Path("diagnostics/mesowest_783se.body")
+          if mesowest_body.exists():
+              text = mesowest_body.read_text(errors="ignore")
+              checks.append(f"mesowest_has_listing={'Tabular Listing' in text}")
 
           for name in ("deployed_state", "deployed_history"):
               body = Path(f"diagnostics/{name}.body")
